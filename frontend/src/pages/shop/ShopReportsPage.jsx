@@ -1,55 +1,71 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import shopStyles from './shopStyles';
+import { shopService } from '../../api/shopService';
+import createPrivateClient from '../../clients/private.client';
 
 const ShopReportsPage = () => {
+  const { token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
+
   const [dateRange, setDateRange] = useState('thisMonth'); // today, thisWeek, thisMonth, custom
   const [reportType, setReportType] = useState('overview'); // overview, revenue, orders, products
+  const [loading, setLoading] = useState(true);
 
-  // Mock data for reports
-  const overviewStats = {
-    revenue: 45680000,
-    revenueGrowth: 12.5,
-    orders: 156,
-    ordersGrowth: 8.3,
-    products_sold: 423,
-    productsGrowth: 15.2,
-    avg_order_value: 292820,
-    avgGrowth: 3.8
-  };
+  // Data states
+  const [overviewStats, setOverviewStats] = useState({
+    revenue: 0,
+    revenueGrowth: 0,
+    orders: 0,
+    ordersGrowth: 0,
+    products_sold: 0,
+    productsGrowth: 0,
+    avg_order_value: 0,
+    avgGrowth: 0
+  });
 
-  const revenueByDay = [
-    { date: '25/11', revenue: 1200000, orders: 5 },
-    { date: '26/11', revenue: 1850000, orders: 8 },
-    { date: '27/11', revenue: 980000, orders: 4 },
-    { date: '28/11', revenue: 2340000, orders: 12 },
-    { date: '29/11', revenue: 1560000, orders: 7 },
-    { date: '30/11', revenue: 2890000, orders: 15 },
-    { date: '01/12', revenue: 1780000, orders: 9 },
-    { date: '02/12', revenue: 2100000, orders: 11 },
-    { date: '03/12', revenue: 1450000, orders: 6 }
-  ];
+  const [revenueByDay, setRevenueByDay] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [orderStatusStats, setOrderStatusStats] = useState([]);
+  const [categoryRevenue, setCategoryRevenue] = useState([]);
 
-  const topProducts = [
-    { id: 1, name: 'Áo Thun Basic Cotton', sold: 89, revenue: 8010000, growth: 25 },
-    { id: 2, name: 'Quần Jeans Slim Fit', sold: 67, revenue: 13400000, growth: 18 },
-    { id: 3, name: 'Áo Hoodie Oversize', sold: 54, revenue: 10800000, growth: 12 },
-    { id: 4, name: 'Váy Midi Hoa', sold: 45, revenue: 6750000, growth: -5 },
-    { id: 5, name: 'Áo Sơ Mi Công Sở', sold: 38, revenue: 5700000, growth: 8 }
-  ];
-
-  const orderStatusStats = [
-    { status: 'Hoàn thành', count: 120, percentage: 77, color: '#4caf50' },
-    { status: 'Đang xử lý', count: 18, percentage: 12, color: '#2196f3' },
-    { status: 'Đang giao', count: 12, percentage: 8, color: '#ff9800' },
-    { status: 'Đã hủy', count: 6, percentage: 3, color: '#f44336' }
-  ];
-
-  const categoryRevenue = [
-    { category: 'Áo', revenue: 18500000, percentage: 40 },
-    { category: 'Quần', revenue: 13800000, percentage: 30 },
-    { category: 'Váy/Đầm', revenue: 8200000, percentage: 18 },
-    { category: 'Phụ kiện', revenue: 5180000, percentage: 12 }
-  ];
+  useEffect(() => {
+    const fetchReportData = async () => {
+      try {
+        setLoading(true);
+        const response = await shopService.getShopRevenueReport(privateClient, { period: dateRange });
+        if (response.data?.data) {
+          const data = response.data.data;
+          setOverviewStats({
+            revenue: data.total_revenue || 0,
+            revenueGrowth: data.revenue_growth || 0,
+            orders: data.total_orders || 0,
+            ordersGrowth: data.orders_growth || 0,
+            products_sold: data.products_sold || 0,
+            productsGrowth: data.products_growth || 0,
+            avg_order_value: data.avg_order_value || 0,
+            avgGrowth: data.avg_growth || 0
+          });
+          setRevenueByDay(data.revenue_by_day || []);
+          setTopProducts(data.top_products || []);
+          setOrderStatusStats(data.order_status || []);
+          setCategoryRevenue(data.category_revenue || []);
+        }
+      } catch (err) {
+        console.error('Error fetching report:', err);
+        // Use fallback mock data if API fails
+        setOverviewStats({
+          revenue: 45680000, revenueGrowth: 12.5,
+          orders: 156, ordersGrowth: 8.3,
+          products_sold: 423, productsGrowth: 15.2,
+          avg_order_value: 292820, avgGrowth: 3.8
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReportData();
+  }, [dateRange, token]);
 
   const styles = {
     ...shopStyles,

@@ -1,78 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import shopStyles from './shopStyles';
+import { productService } from '../../api/productService';
+import { categoryService } from '../../api/categoryService';
+import createPrivateClient from '../../clients/private.client';
 
 const ShopProductsPage = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useSelector(state => state.auth);
+  const { isAuthenticated, token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock products data
-  const [products, setProducts] = useState([
-    {
-      product_id: 1,
-      product_name: 'Áo thun nam cotton cao cấp Premium',
-      image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop',
-      category: 'Thời Trang Nam',
-      price: 129000,
-      stock: 150,
-      sold: 234,
-      status: 'Active',
-      rating: 4.8
-    },
-    {
-      product_id: 2,
-      product_name: 'Quần jean nam slim fit cao cấp',
-      image: 'https://images.unsplash.com/photo-1542272604-787c62d465d1?w=200&h=200&fit=crop',
-      category: 'Thời Trang Nam',
-      price: 259000,
-      stock: 85,
-      sold: 156,
-      status: 'Active',
-      rating: 4.9
-    },
-    {
-      product_id: 3,
-      product_name: 'Giày thể thao nam sneaker',
-      image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop',
-      category: 'Giày Dép',
-      price: 449000,
-      stock: 0,
-      sold: 98,
-      status: 'Out of Stock',
-      rating: 4.7
-    },
-    {
-      product_id: 4,
-      product_name: 'Túi xách nữ da PU cao cấp',
-      image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=200&h=200&fit=crop',
-      category: 'Túi Xách',
-      price: 199000,
-      stock: 45,
-      sold: 312,
-      status: 'Active',
-      rating: 4.6
-    },
-    {
-      product_id: 5,
-      product_name: 'Đồng hồ thông minh smartwatch',
-      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop',
-      category: 'Đồng Hồ',
-      price: 599000,
-      stock: 20,
-      sold: 67,
-      status: 'Inactive',
-      rating: 4.9
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/signin');
+      return;
     }
-  ]);
 
-  const categories = ['Tất cả', 'Thời Trang Nam', 'Thời Trang Nữ', 'Giày Dép', 'Túi Xách', 'Đồng Hồ', 'Điện Tử'];
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [productsRes, categoriesRes] = await Promise.all([
+          productService.getMyShopProducts(privateClient),
+          categoryService.getCategories()
+        ]);
+        
+        if (productsRes.data?.data?.products) {
+          setProducts(productsRes.data.data.products.map(p => ({
+            product_id: p.product_id,
+            product_name: p.product_name,
+            image: p.image,
+            category: p.category_name,
+            price: p.min_price || 0,
+            stock: p.total_stock || 0,
+            sold: p.total_sold || 0,
+            status: p.status,
+            rating: p.avg_rating || 0
+          })));
+        }
+        
+        if (categoriesRes.data?.data) {
+          setCategories(['Tất cả', ...categoriesRes.data.data.map(c => c.category_name)]);
+        }
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        setError('Không thể tải danh sách sản phẩm');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [isAuthenticated, navigate, token]);
 
   const formatPrice = (price) => price.toLocaleString('vi-VN') + 'đ';
 
@@ -110,13 +98,41 @@ const ShopProductsPage = () => {
     setShowDeleteModal(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (productToDelete) {
-      setProducts(products.filter(p => p.product_id !== productToDelete.product_id));
-      setShowDeleteModal(false);
-      setProductToDelete(null);
+      try {
+        await productService.deleteProduct(productToDelete.product_id, privateClient);
+        setProducts(products.filter(p => p.product_id !== productToDelete.product_id));
+        setShowDeleteModal(false);
+        setProductToDelete(null);
+      } catch (err) {
+        console.error('Error deleting product:', err);
+        alert('Không thể xóa sản phẩm. Vui lòng thử lại!');
+      }
     }
   };
+
+  if (loading) {
+    return (
+      <div style={shopStyles.page}>
+        <div style={{ textAlign: 'center', padding: '60px' }}>
+          <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
+          <p>Đang tải danh sách sản phẩm...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={shopStyles.page}>
+        <div style={{ textAlign: 'center', padding: '60px' }}>
+          <div style={{ fontSize: '32px', marginBottom: '16px' }}>❌</div>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     navigate('/signin');

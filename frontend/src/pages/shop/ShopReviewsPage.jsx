@@ -1,123 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import shopStyles from './shopStyles';
+import { reviewService } from '../../api/reviewService';
+import createPrivateClient from '../../clients/private.client';
 
 const ShopReviewsPage = () => {
+  const { token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
+
   const [filterRating, setFilterRating] = useState('all'); // all, 5, 4, 3, 2, 1
   const [filterStatus, setFilterStatus] = useState('all'); // all, replied, pending
   const [searchTerm, setSearchTerm] = useState('');
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock reviews data
-  const reviews = [
-    {
-      id: 1,
-      order_id: 1001,
-      product_id: 1,
-      product_name: 'Áo thun nam cotton cao cấp',
-      product_image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=100&h=100&fit=crop',
-      customer_name: 'Nguyễn Văn A',
-      customer_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=NVA',
-      rating: 5,
-      comment: 'Sản phẩm rất tốt, chất lượng vải mềm mại, đúng như mô tả. Giao hàng nhanh, đóng gói cẩn thận. Sẽ ủng hộ shop lần sau!',
-      images: [
-        'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop',
-        'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=200&h=200&fit=crop'
-      ],
-      created_at: '2024-12-02',
-      replied: true,
-      reply: 'Cảm ơn bạn đã ủng hộ shop! Rất vui vì bạn hài lòng với sản phẩm. Hẹn gặp lại bạn! 💚',
-      reply_date: '2024-12-02'
-    },
-    {
-      id: 2,
-      order_id: 1002,
-      product_id: 2,
-      product_name: 'Quần jean nam slim fit',
-      product_image: 'https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?w=100&h=100&fit=crop',
-      customer_name: 'Trần Thị B',
-      customer_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=TTB',
-      rating: 4,
-      comment: 'Quần đẹp, form chuẩn. Tuy nhiên màu hơi đậm hơn so với hình ảnh một chút. Nhìn chung vẫn hài lòng.',
-      images: [],
-      created_at: '2024-12-01',
-      replied: false,
-      reply: '',
-      reply_date: null
-    },
-    {
-      id: 3,
-      order_id: 1003,
-      product_id: 3,
-      product_name: 'Giày thể thao sneaker',
-      product_image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=100&h=100&fit=crop',
-      customer_name: 'Lê Văn C',
-      customer_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=LVC',
-      rating: 5,
-      comment: 'Giày rất êm, đi cả ngày không mỏi chân. Thiết kế đẹp, phối đồ dễ dàng.',
-      images: [
-        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop'
-      ],
-      created_at: '2024-11-30',
-      replied: true,
-      reply: 'Cảm ơn bạn đã tin tưởng và đánh giá! Shop rất vui khi sản phẩm làm hài lòng bạn ạ! 🎉',
-      reply_date: '2024-11-30'
-    },
-    {
-      id: 4,
-      order_id: 1004,
-      product_id: 4,
-      product_name: 'Váy midi hoa nhí',
-      product_image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=100&h=100&fit=crop',
-      customer_name: 'Phạm Thị D',
-      customer_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=PTD',
-      rating: 3,
-      comment: 'Váy đẹp nhưng size hơi nhỏ so với bảng size. Nên order lớn hơn 1 size.',
-      images: [],
-      created_at: '2024-11-29',
-      replied: false,
-      reply: '',
-      reply_date: null
-    },
-    {
-      id: 5,
-      order_id: 1005,
-      product_id: 1,
-      product_name: 'Áo thun nam cotton cao cấp',
-      product_image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=100&h=100&fit=crop',
-      customer_name: 'Hoàng Văn E',
-      customer_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=HVE',
-      rating: 2,
-      comment: 'Chất lượng không như mong đợi. Vải mỏng và nhanh nhão sau khi giặt.',
-      images: [
-        'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=200&h=200&fit=crop'
-      ],
-      created_at: '2024-11-28',
-      replied: true,
-      reply: 'Shop xin lỗi vì trải nghiệm không tốt của bạn. Shop sẽ liên hệ để hỗ trợ đổi trả ạ. Mong bạn cho shop cơ hội phục vụ tốt hơn! 🙏',
-      reply_date: '2024-11-28'
-    },
-    {
-      id: 6,
-      order_id: 1006,
-      product_id: 5,
-      product_name: 'Áo sơ mi công sở',
-      product_image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=100&h=100&fit=crop',
-      customer_name: 'Ngô Thị F',
-      customer_avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=NTF',
-      rating: 5,
-      comment: 'Áo đẹp lắm, vải mát mặc đi làm rất thoải mái. Shop tư vấn nhiệt tình. 10 điểm!',
-      images: [],
-      created_at: '2024-11-27',
-      replied: false,
-      reply: '',
-      reply_date: null
-    }
-  ];
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        setLoading(true);
+        const params = { target_type: 'Product' };
+        if (filterRating !== 'all') {
+          params.rating = filterRating;
+        }
+        const response = await reviewService.getReviews(params);
+        if (response.data?.data?.reviews) {
+          setReviews(response.data.data.reviews.map(r => ({
+            id: r.review_id,
+            order_id: r.order_id,
+            product_id: r.target_id,
+            product_name: r.product_name || 'Sản phẩm',
+            product_image: r.product_image || 'https://via.placeholder.com/100',
+            customer_name: r.customer_name || 'Khách hàng',
+            customer_avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.customer_id}`,
+            rating: r.rating,
+            comment: r.comment,
+            images: r.images || [],
+            created_at: new Date(r.created_at).toLocaleDateString('vi-VN'),
+            replied: !!r.reply,
+            reply: r.reply || '',
+            reply_date: r.reply_date ? new Date(r.reply_date).toLocaleDateString('vi-VN') : null
+          })));
+        }
+      } catch (err) {
+        console.error('Error fetching reviews:', err);
+        setError('Không thể tải danh sách đánh giá');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReviews();
+  }, [filterRating, token]);
 
   // Stats
   const stats = {
     total: reviews.length,
-    average: (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1),
+    average: reviews.length > 0 ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) : '0',
     pending: reviews.filter(r => !r.replied).length,
     replied: reviews.filter(r => r.replied).length,
     byRating: {

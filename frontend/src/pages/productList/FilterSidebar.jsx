@@ -94,11 +94,12 @@ const FilterSidebar = ({
     },
     priceInputs: {
       display: 'flex',
+      flexDirection: 'column',
       gap: '8px',
-      alignItems: 'center'
+      alignItems: 'stretch'
     },
     priceInput: {
-      flex: 1,
+      width: '100%',
       padding: '8px 10px',
       fontSize: '13px',
       border: '1px solid #e0e0e0',

@@ -5,6 +5,7 @@ import OrderDetailTimeline from './order/OrderDetailTimeline';
 import OrderDetailProducts from './order/OrderDetailProducts';
 import OrderDetailSummary from './order/OrderDetailSummary';
 import orderDetailStyles from './order/orderDetailStyles';
+import { orderService } from '../api/orderService';
 
 const OrderDetailPage = () => {
   const { id } = useParams();
@@ -15,6 +16,7 @@ const OrderDetailPage = () => {
   // Get order from navigation state or fetch
   const [order, setOrder] = useState(location.state?.order || null);
   const [loading, setLoading] = useState(!order);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -22,19 +24,31 @@ const OrderDetailPage = () => {
       return;
     }
 
-    if (!order) {
-      // Mock fetch order by ID
-      setTimeout(() => {
-        const mockOrder = getMockOrderById(id);
-        setOrder(mockOrder);
-        setLoading(false);
-      }, 500);
+    if (!order && id) {
+      // Fetch order by ID from API
+      const fetchOrder = async () => {
+        try {
+          setLoading(true);
+          const response = await orderService.getOrderById(id);
+          if (response.data?.data) {
+            setOrder(response.data.data);
+          } else {
+            setError('Order not found');
+          }
+        } catch (err) {
+          console.error('Error fetching order:', err);
+          setError('Unable to load order information');
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchOrder();
     }
   }, [id, order, isAuthenticated, navigate]);
 
   const formatPrice = (price) => {
     const value = Number(price ?? 0);
-    return value.toLocaleString('vi-VN') + 'đ';
+    return value.toLocaleString('en-US') + ' VND';
   };
 
   const getStatusStyle = (status) => {
@@ -54,17 +68,17 @@ const OrderDetailPage = () => {
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'Processing': return 'Đang xử lý';
-      case 'Shipped': return 'Đang giao hàng';
-      case 'Delivered': return 'Đã giao hàng';
-      case 'Cancelled': return 'Đã hủy';
+      case 'Processing': return 'Processing';
+      case 'Shipped': return 'Shipped';
+      case 'Delivered': return 'Delivered';
+      case 'Cancelled': return 'Cancelled';
       default: return status;
     }
   };
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleString('vi-VN', {
+    return new Date(dateString).toLocaleString('en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -73,16 +87,22 @@ const OrderDetailPage = () => {
     });
   };
 
-  const handleCancelOrder = () => {
-    if (window.confirm('Bạn có chắc muốn hủy đơn hàng này?')) {
-      alert('Đã gửi yêu cầu hủy đơn hàng!');
-      setOrder(prev => ({ ...prev, status: 'Cancelled' }));
+  const handleCancelOrder = async () => {
+    if (window.confirm('Are you sure you want to cancel this order?')) {
+      try {
+        await orderService.cancelOrder(order.order_id);
+        alert('Order has been successfully cancelled!');
+        setOrder(prev => ({ ...prev, status: 'Cancelled' }));
+      } catch (err) {
+        console.error('Error cancelling order:', err);
+        alert('Unable to cancel order. Please try again!');
+      }
     }
   };
 
   const handleReorder = () => {
     // Add items back to cart
-    alert('Đã thêm các sản phẩm vào giỏ hàng!');
+    alert('Items have been added to the cart!');
     navigate('/cart');
   };
 
@@ -91,7 +111,7 @@ const OrderDetailPage = () => {
       <div style={orderDetailStyles.container}>
         <div style={{ textAlign: 'center', padding: '60px' }}>
           <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
-          <p>Đang tải thông tin đơn hàng...</p>
+          <p>Loading order information...</p>
         </div>
       </div>
     );
@@ -103,13 +123,13 @@ const OrderDetailPage = () => {
         <div style={orderDetailStyles.notFound}>
           <div style={orderDetailStyles.notFoundIcon}>📦</div>
           <div style={orderDetailStyles.notFoundText}>
-            Không tìm thấy đơn hàng #{id}
+            Order not found #{id}
           </div>
           <button
             style={orderDetailStyles.primaryBtn}
             onClick={() => navigate('/profile')}
           >
-            Quay lại đơn hàng
+            Back to Orders
           </button>
         </div>
       </div>
@@ -124,10 +144,10 @@ const OrderDetailPage = () => {
           style={orderDetailStyles.backBtn}
           onClick={() => navigate('/profile')}
         >
-          ← Quay lại
+          ← Back
         </button>
         <div style={orderDetailStyles.orderIdBadge}>
-          Đơn hàng #{order.order_id}
+          Order #{order.order_id}
         </div>
         <span style={getStatusStyle(order.status)}>
           {getStatusText(order.status)}
@@ -141,7 +161,7 @@ const OrderDetailPage = () => {
           {/* Timeline */}
           <div style={orderDetailStyles.card}>
             <h3 style={orderDetailStyles.cardTitle}>
-              📍 Trạng thái đơn hàng
+              📍 Order Status
             </h3>
             <OrderDetailTimeline
               status={order.status}
@@ -153,7 +173,7 @@ const OrderDetailPage = () => {
           {/* Products */}
           <div style={orderDetailStyles.card}>
             <h3 style={orderDetailStyles.cardTitle}>
-              🛍️ Sản phẩm đã đặt
+              Products Ordered
             </h3>
             <OrderDetailProducts
               items={order.items || []}
@@ -165,30 +185,30 @@ const OrderDetailPage = () => {
           {/* Shipping Info */}
           <div style={orderDetailStyles.card}>
             <h3 style={orderDetailStyles.cardTitle}>
-              🚚 Thông tin giao hàng
+              Shipping Information
             </h3>
             <div style={orderDetailStyles.infoRow}>
-              <span style={orderDetailStyles.infoLabel}>Người nhận</span>
+              <span style={orderDetailStyles.infoLabel}>Recipient</span>
               <span style={orderDetailStyles.infoValue}>
-                {order.customer_name || order.receiver_name || 'Khách hàng'}
+                {order.customer_name || order.receiver_name || 'Customer'}
               </span>
             </div>
             <div style={orderDetailStyles.infoRow}>
-              <span style={orderDetailStyles.infoLabel}>Số điện thoại</span>
+              <span style={orderDetailStyles.infoLabel}>Phone Number</span>
               <span style={orderDetailStyles.infoValue}>
                 {order.phone || order.receiver_phone || '0901234567'}
               </span>
             </div>
             <div style={orderDetailStyles.infoRow}>
-              <span style={orderDetailStyles.infoLabel}>Địa chỉ</span>
+              <span style={orderDetailStyles.infoLabel}>Address</span>
               <span style={orderDetailStyles.infoValue}>
                 {order.shipping_address}
               </span>
             </div>
             <div style={{ ...orderDetailStyles.infoRow, ...orderDetailStyles.infoRowLast }}>
-              <span style={orderDetailStyles.infoLabel}>Phương thức</span>
+              <span style={orderDetailStyles.infoLabel}>Method</span>
               <span style={orderDetailStyles.infoValue}>
-                {order.shipping_method?.name || order.shipping?.name || 'Giao hàng tiêu chuẩn'}
+                {order.shipping_method?.name || order.shipping?.name || 'Standard Shipping'}
               </span>
             </div>
           </div>
@@ -196,21 +216,21 @@ const OrderDetailPage = () => {
           {/* Payment Info */}
           <div style={orderDetailStyles.card}>
             <h3 style={orderDetailStyles.cardTitle}>
-              💳 Thanh toán
+              Payment
             </h3>
             <div style={orderDetailStyles.infoRow}>
-              <span style={orderDetailStyles.infoLabel}>Phương thức</span>
+              <span style={orderDetailStyles.infoLabel}>Method</span>
               <span style={orderDetailStyles.infoValue}>
                 {getPaymentMethodText(order.payment_method)}
               </span>
             </div>
             <div style={{ ...orderDetailStyles.infoRow, ...orderDetailStyles.infoRowLast }}>
-              <span style={orderDetailStyles.infoLabel}>Trạng thái</span>
+              <span style={orderDetailStyles.infoLabel}>Status</span>
               <span style={{
                 ...orderDetailStyles.infoValue,
                 color: order.status === 'Delivered' ? '#28a745' : '#856404'
               }}>
-                {order.status === 'Delivered' ? '✅ Đã thanh toán' : '⏳ Chờ thanh toán'}
+                {order.status === 'Delivered' ? ' Paid' : 'Pending Payment'}
               </span>
             </div>
           </div>
@@ -221,21 +241,21 @@ const OrderDetailPage = () => {
           {/* Order Summary */}
           <div style={orderDetailStyles.card}>
             <h3 style={orderDetailStyles.cardTitle}>
-              📋 Tóm tắt đơn hàng
+              Order Summary
             </h3>
             <div style={orderDetailStyles.infoRow}>
-              <span style={orderDetailStyles.infoLabel}>Mã đơn hàng</span>
+              <span style={orderDetailStyles.infoLabel}>Order ID</span>
               <span style={orderDetailStyles.infoValue}>#{order.order_id}</span>
             </div>
             <div style={orderDetailStyles.infoRow}>
-              <span style={orderDetailStyles.infoLabel}>Ngày đặt</span>
+              <span style={orderDetailStyles.infoLabel}>Order Date</span>
               <span style={orderDetailStyles.infoValue}>
                 {formatDate(order.created_at)}
               </span>
             </div>
             {order.note && (
               <div style={{ ...orderDetailStyles.infoRow, ...orderDetailStyles.infoRowLast }}>
-                <span style={orderDetailStyles.infoLabel}>Ghi chú</span>
+                <span style={orderDetailStyles.infoLabel}>Note</span>
                 <span style={orderDetailStyles.infoValue}>{order.note}</span>
               </div>
             )}
@@ -255,7 +275,7 @@ const OrderDetailPage = () => {
                   style={orderDetailStyles.dangerBtn}
                   onClick={handleCancelOrder}
                 >
-                  Hủy đơn
+                  Cancel Order
                 </button>
               )}
               {order.status === 'Delivered' && (
@@ -264,19 +284,19 @@ const OrderDetailPage = () => {
                     style={orderDetailStyles.primaryBtn}
                     onClick={() => navigate(`/review/${order.order_id}`)}
                   >
-                    ⭐ Đánh giá
+                    ⭐ Review
                   </button>
                   <button
                     style={orderDetailStyles.secondaryBtn}
                     onClick={handleReorder}
                   >
-                    🔄 Mua lại
+                    Reorder
                   </button>
                 </>
               )}
               {order.status === 'Shipped' && (
                 <button style={orderDetailStyles.primaryBtn}>
-                  📞 Liên hệ shipper
+                  Contact Shipper
                 </button>
               )}
             </div>
@@ -285,29 +305,29 @@ const OrderDetailPage = () => {
           {/* Help Card */}
           <div style={orderDetailStyles.helpCard}>
             <div style={orderDetailStyles.helpTitle}>
-              Cần hỗ trợ?
+              Need Help?
             </div>
             <div style={orderDetailStyles.helpText}>
-              Liên hệ với chúng tôi nếu bạn gặp vấn đề với đơn hàng
+              Contact us if you have any issues with your order
             </div>
             <button style={orderDetailStyles.helpBtn}>
-              💬 Chat với hỗ trợ
+              Chat with Support
             </button>
           </div>
 
           {/* Shop Contact */}
           <div style={orderDetailStyles.card}>
             <h3 style={orderDetailStyles.cardTitle}>
-              🏪 Liên hệ shop
+              Contact Shop
             </h3>
             <div style={{ marginBottom: '12px' }}>
               <strong>{order.items?.[0]?.shop_name || order.items?.[0]?.shop?.shop_name || 'Shop'}</strong>
             </div>
             <button
               style={{ ...orderDetailStyles.secondaryBtn, width: '100%' }}
-              onClick={() => alert('Mở chat với shop')}
+              onClick={() => alert('Open chat with shop')}
             >
-              💬 Chat với shop
+              Chat with Shop
             </button>
           </div>
         </div>
@@ -319,153 +339,12 @@ const OrderDetailPage = () => {
 // Helper functions
 const getPaymentMethodText = (method) => {
   const methods = {
-    'COD': '💵 Thanh toán khi nhận hàng (COD)',
-    'Banking': '🏦 Chuyển khoản ngân hàng',
-    'Momo': '📱 Ví MoMo',
-    'ZaloPay': '💳 ZaloPay'
+    'COD': ' Cash on Delivery (COD)',
+    'Banking': 'Bank Transfer',
+    'Momo': 'MoMo Wallet',
+    'ZaloPay': 'ZaloPay'
   };
   return methods[method] || method || 'COD';
-};
-
-// Mock data
-const getMockOrderById = (id) => {
-  const mockOrders = {
-    '1001': {
-      order_id: 1001,
-      customer_id: 1,
-      customer_name: 'Nguyễn Văn A',
-      phone: '0901234567',
-      shipping_id: 2,
-      voucher_id: 1,
-      status: 'Delivered',
-      shipping_address: '123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM',
-      shipping_method: { name: 'Giao hàng nhanh', fee: 50000 },
-      subtotal: 707000,
-      shipping_fee: 50000,
-      discount: 70700,
-      total_price: 686300,
-      payment_method: 'COD',
-      voucher: { code: 'GIAM10', discount_amount: 70700 },
-      created_at: '2024-11-28T14:30:00',
-      items: [
-        {
-          order_item_id: 1,
-          product_id: 1,
-          product_name: 'Áo thun nam cotton cao cấp Premium',
-          image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop',
-          color: 'Trắng',
-          type: 'L',
-          quantity: 2,
-          price: 129000,
-          price_at_purchase: 129000,
-          shop_id: 1,
-          shop_name: 'Cửa hàng Kim Tín'
-        },
-        {
-          order_item_id: 2,
-          product_id: 3,
-          product_name: 'Giày thể thao nam sneaker',
-          image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop',
-          color: 'Đỏ',
-          type: '42',
-          quantity: 1,
-          price: 449000,
-          price_at_purchase: 449000,
-          shop_id: 1,
-          shop_name: 'Cửa hàng Kim Tín'
-        }
-      ]
-    },
-    '1002': {
-      order_id: 1002,
-      customer_id: 1,
-      customer_name: 'Nguyễn Văn A',
-      phone: '0901234567',
-      status: 'Shipped',
-      shipping_address: '123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM',
-      shipping_method: { name: 'Giao hàng tiêu chuẩn', fee: 30000 },
-      subtotal: 1580000,
-      shipping_fee: 30000,
-      discount: 0,
-      total_price: 1610000,
-      payment_method: 'Banking',
-      created_at: '2024-12-01T09:15:00',
-      items: [
-        {
-          order_item_id: 3,
-          product_id: 5,
-          product_name: 'Tai nghe Bluetooth không dây TWS',
-          image_url: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=200&h=200&fit=crop',
-          color: 'Đen',
-          type: 'Pro',
-          quantity: 1,
-          price: 890000,
-          price_at_purchase: 890000,
-          shop_id: 2,
-          shop_name: 'TechZone Official'
-        },
-        {
-          order_item_id: 4,
-          product_id: 6,
-          product_name: 'Ốp lưng iPhone 15 Pro Max',
-          image_url: 'https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?w=200&h=200&fit=crop',
-          color: 'Trong suốt',
-          type: 'MagSafe',
-          quantity: 2,
-          price: 345000,
-          price_at_purchase: 345000,
-          shop_id: 2,
-          shop_name: 'TechZone Official'
-        }
-      ]
-    },
-    '1003': {
-      order_id: 1003,
-      customer_id: 1,
-      customer_name: 'Nguyễn Văn A',
-      phone: '0901234567',
-      status: 'Processing',
-      shipping_address: '123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM',
-      shipping_method: { name: 'Giao hỏa tốc', fee: 80000 },
-      subtotal: 2150000,
-      shipping_fee: 80000,
-      discount: 215000,
-      total_price: 2015000,
-      payment_method: 'Momo',
-      voucher: { code: 'GIAM10', discount_amount: 215000 },
-      created_at: '2024-12-02T16:45:00',
-      items: [
-        {
-          order_item_id: 5,
-          product_id: 7,
-          product_name: 'Váy đầm nữ phong cách Hàn Quốc',
-          image_url: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=200&h=200&fit=crop',
-          color: 'Hồng',
-          type: 'M',
-          quantity: 1,
-          price: 650000,
-          price_at_purchase: 585000,
-          shop_id: 3,
-          shop_name: 'Fashion House'
-        },
-        {
-          order_item_id: 6,
-          product_id: 8,
-          product_name: 'Son môi lì cao cấp',
-          image_url: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=200&h=200&fit=crop',
-          color: 'Đỏ cherry',
-          type: 'Matte',
-          quantity: 3,
-          price: 350000,
-          price_at_purchase: 315000,
-          shop_id: 4,
-          shop_name: 'Beauty Store'
-        }
-      ]
-    }
-  };
-
-  return mockOrders[id] || null;
 };
 
 export default OrderDetailPage;

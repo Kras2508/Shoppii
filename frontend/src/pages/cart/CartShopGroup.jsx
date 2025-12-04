@@ -1,7 +1,9 @@
 import React from 'react';
 import CartItem from './CartItem';
 
-const CartShopGroup = ({ shop, items, onQuantityChange, onSelect, onRemove, onSelectShop, styles }) => {
+const CartShopGroup = ({ shop, items, selectedItems, onQuantityChange, onSelect, onRemove, onSelectShop, styles }) => {
+  const allSelected = items.length > 0 && items.every(item => selectedItems?.has(item.item_id));
+  
   return (
     <div style={styles.shopGroup}>
       {/* Shop Header */}
@@ -9,7 +11,7 @@ const CartShopGroup = ({ shop, items, onQuantityChange, onSelect, onRemove, onSe
         <input
           type="checkbox"
           style={styles.checkbox}
-          checked={items.every(item => item.selected)}
+          checked={allSelected}
           onChange={() => onSelectShop(shop.id)}
         />
         <div style={styles.shopName}>
@@ -21,8 +23,9 @@ const CartShopGroup = ({ shop, items, onQuantityChange, onSelect, onRemove, onSe
       {/* Shop Items */}
       {items.map(item => (
         <CartItem
-          key={item.id}
+          key={item.item_id || item.cart_item_id}
           item={item}
+          selected={selectedItems?.has(item.item_id)}
           onQuantityChange={onQuantityChange}
           onSelect={onSelect}
           onRemove={onRemove}

@@ -1,14 +1,27 @@
 import express from 'express'
 import http from 'http'
+import cors from 'cors'
 import { Server } from 'socket.io'
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { testConnection } from './config/database.js';
+import routes from './routes/index.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  credentials: true
+}));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// API Routes
+app.use('/api', routes);
 
 // Create HTTP server
 const server = http.createServer(app)
@@ -16,8 +29,9 @@ const server = http.createServer(app)
 // Initialize Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     methods: ['GET', 'POST'],
+    credentials: true
   },
 })
 
@@ -33,10 +47,28 @@ io.on('connection', (socket) => {
 // Make io accessible to routes
 app.set('io', io)
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal server error'
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
+  });
+});
+
 // Connect to database and start server
 testConnection().then(() => {
   server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`)
+    console.log(`📚 API Documentation: http://localhost:${PORT}/api/health`)
   })
 })
 

@@ -1,12 +1,24 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { authService } from '../api/authService.js';
+import { loginUser } from '../redux/slice/auth.slice.js';
 
 const SignUpPage = () => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+
   const [formData, setFormData] = React.useState({
-    name: '',
+    fullName: '',
     email: '',
-    password: ''
+    password: '',
+    confirmPassword: '',
+    role: 'Customer',
+    phone: ''
   });
   const [agreeTerms, setAgreeTerms] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
 
   const styles = {
     page: {
@@ -142,13 +154,49 @@ const SignUpPage = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+
     if (!agreeTerms) {
-      alert('Vui lòng đồng ý với điều khoản và chính sách');
+      setError('Vui lòng đồng ý với điều khoản và chính sách');
       return;
     }
-    console.log('Sign up:', formData);
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Mật khẩu không khớp');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Mật khẩu phải có ít nhất 6 ký tự');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await authService.register({
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        full_name: formData.fullName,
+        phone: formData.phone
+      });
+
+      if (response.data?.success) {
+        // Auto login
+        const loginRes = await authService.login(formData.email, formData.password);
+        if (loginRes.data?.data) {
+          await dispatch(loginUser(loginRes.data.data));
+          navigate(formData.role === 'Shop' ? '/shop' : '/');
+        }
+      }
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError(err.response?.data?.message || 'Lỗi khi đăng ký');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -161,15 +209,43 @@ const SignUpPage = () => {
           </div>
 
           <form onSubmit={handleSubmit}>
+            {error && (
+              <div style={{
+                backgroundColor: '#fee',
+                color: '#c33',
+                padding: '10px 12px',
+                borderRadius: '6px',
+                fontSize: '14px',
+                marginBottom: '20px',
+                border: '1px solid #fcc'
+              }}>
+                {error}
+              </div>
+            )}
+
             <div style={styles.formGroup}>
               <label style={styles.label}>Full Name</label>
               <input
                 type="text"
-                name="name"
+                name="fullName"
                 placeholder="Your full name"
-                value={formData.name}
+                value={formData.fullName}
                 onChange={handleInputChange}
                 required
+                style={styles.input}
+                onFocus={(e) => e.target.style.borderColor = '#647A67'}
+                onBlur={(e) => e.target.style.borderColor = '#ddd'}
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Số điện thoại</label>
+              <input
+                type="tel"
+                name="phone"
+                placeholder="Your phone number"
+                value={formData.phone}
+                onChange={handleInputChange}
                 style={styles.input}
                 onFocus={(e) => e.target.style.borderColor = '#647A67'}
                 onBlur={(e) => e.target.style.borderColor = '#ddd'}
@@ -206,6 +282,62 @@ const SignUpPage = () => {
               />
             </div>
 
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Xác nhận mật khẩu</label>
+              <input
+                type="password"
+                name="confirmPassword"
+                placeholder="Confirm your password"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                required
+                style={styles.input}
+                onFocus={(e) => e.target.style.borderColor = '#647A67'}
+                onBlur={(e) => e.target.style.borderColor = '#ddd'}
+              />
+            </div>
+
+            {/* Role Selection */}
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Đăng ký với vai trò</label>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, role: 'Customer' }))}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    border: formData.role === 'Customer' ? '2px solid #647A67' : '1px solid #ddd',
+                    backgroundColor: formData.role === 'Customer' ? '#C5EFCB' : 'white',
+                    color: formData.role === 'Customer' ? '#1F241F' : '#666',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🛍️ Người mua
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, role: 'Shop' }))}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    border: formData.role === 'Shop' ? '2px solid #647A67' : '1px solid #ddd',
+                    backgroundColor: formData.role === 'Shop' ? '#C5EFCB' : 'white',
+                    color: formData.role === 'Shop' ? '#1F241F' : '#666',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🏪 Người bán
+                </button>
+              </div>
+            </div>
+
             <div style={styles.checkboxGroup}>
               <input
                 type="checkbox"
@@ -221,18 +353,20 @@ const SignUpPage = () => {
 
             <button
               type="submit"
+              disabled={!agreeTerms || loading}
               style={{
                 ...styles.button,
-                backgroundColor: agreeTerms ? '#647A67' : '#ccc'
+                backgroundColor: agreeTerms && !loading ? '#647A67' : '#ccc',
+                cursor: agreeTerms && !loading ? 'pointer' : 'not-allowed'
               }}
               onMouseEnter={(e) => {
-                if (agreeTerms) e.target.style.backgroundColor = '#556B5A';
+                if (agreeTerms && !loading) e.target.style.backgroundColor = '#556B5A';
               }}
               onMouseLeave={(e) => {
-                if (agreeTerms) e.target.style.backgroundColor = '#647A67';
+                if (agreeTerms && !loading) e.target.style.backgroundColor = '#647A67';
               }}
             >
-              Signup
+              {loading ? 'Đang đăng ký...' : 'Signup'}
             </button>
           </form>
 

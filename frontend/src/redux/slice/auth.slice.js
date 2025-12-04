@@ -1,23 +1,33 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { mockLogin } from "../../mockData/mockUsers.js";
-// import { authApi } from "../../api/auth.api.js";
+import { authService } from "../../api/authService.js";
 
 export const loginUser = createAsyncThunk(
 	"auth/loginUser",
 	async ({ email, password }, { rejectWithValue }) => {
 		try {
-			// Use mock login for now
-			const response = mockLogin(email, password);
+			const response = await authService.login(email, password);
 
-			if (response.success && response.token) {
-				localStorage.setItem("user", JSON.stringify(response.user));
-				localStorage.setItem("token", response.token);
-				return response;
+			if (response.data && response.data.data) {
+				const userData = response.data.data;
+				const token = userData.token;
+				
+				if (!token) {
+					return rejectWithValue("No token received from server");
+				}
+
+				localStorage.setItem("user", JSON.stringify(userData));
+				localStorage.setItem("token", token);
+				
+				return {
+					success: true,
+					user: userData,
+					token: token
+				};
 			} else {
-				return rejectWithValue(response.error || "Login failed.");
+				return rejectWithValue(response.data?.message || "Login failed.");
 			}
 		} catch (error) {
-			const message = error.message || "An unexpected error occurred.";
+			const message = error.response?.data?.message || error.message || "An unexpected error occurred.";
 			return rejectWithValue(message);
 		}
 	}

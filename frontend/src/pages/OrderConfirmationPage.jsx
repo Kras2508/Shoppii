@@ -3,6 +3,7 @@ import { Link, useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { OrderSuccess, OrderTimeline, OrderInfo, OrderItems } from './order';
 import orderStyles from './order/orderStyles';
+import { orderService } from '../api/orderService';
 
 const OrderConfirmationPage = () => {
   const { orderId } = useParams();
@@ -10,9 +11,10 @@ const OrderConfirmationPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector(state => state.auth);
 
-  // Get order from location state hoặc mock data
+  // Get order from location state hoặc fetch from API
   const [order, setOrder] = useState(location.state?.order || null);
   const [loading, setLoading] = useState(!order);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -20,74 +22,25 @@ const OrderConfirmationPage = () => {
       return;
     }
 
-    // Nếu không có order từ state, fetch mock data
+    // Nếu không có order từ state, fetch từ API
     if (!order && orderId) {
-      // Mock order data theo database schema
-      const mockOrder = {
-        order_id: parseInt(orderId) || 1001,
-        customer_id: 1,
-        shipping_id: 1,
-        voucher_id: null,
-        status: 'Processing', // Processing, Shipped, Delivered, Cancelled
-        order_date: new Date().toISOString(),
-        shipping_address: '123 Nguyễn Văn A, Phường 1, Quận 1, TP. Hồ Chí Minh',
-        total_amount: 737000,
-        payment_method: 'COD',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        
-        // Related data
-        shipping: {
-          shipping_id: 1,
-          name: 'Giao hàng tiêu chuẩn',
-          estimated_days: 5,
-          fee: 30000,
-          status: 'Active'
-        },
-        voucher: null,
-        
-        // Calculated fields
-        subtotal: 707000,
-        shipping_fee: 30000,
-        discount: 0,
-        
-        // Order items - theo OrderItem table
-        items: [
-          {
-            order_item_id: 1,
-            order_id: 1001,
-            variantID: 1,
-            shop_id: 1,
-            quantity: 2,
-            price_at_purchase: 129000,
-            // Extended data
-            product_id: 1,
-            product_name: 'Áo thun nam cotton cao cấp Premium',
-            image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop',
-            color: 'Trắng',
-            type: 'L',
-            shop_name: 'Cửa hàng Kim Tín'
-          },
-          {
-            order_item_id: 2,
-            order_id: 1001,
-            variantID: 3,
-            shop_id: 1,
-            quantity: 1,
-            price_at_purchase: 449000,
-            // Extended data
-            product_id: 3,
-            product_name: 'Giày thể thao nam sneaker',
-            image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop',
-            color: 'Đỏ',
-            type: '42',
-            shop_name: 'Cửa hàng Kim Tín'
+      const fetchOrder = async () => {
+        try {
+          setLoading(true);
+          const response = await orderService.getOrderById(orderId);
+          if (response.data?.data) {
+            setOrder(response.data.data);
+          } else {
+            setError('Không tìm thấy đơn hàng');
           }
-        ]
+        } catch (err) {
+          console.error('Error fetching order:', err);
+          setError('Không thể tải thông tin đơn hàng');
+        } finally {
+          setLoading(false);
+        }
       };
-      
-      setOrder(mockOrder);
-      setLoading(false);
+      fetchOrder();
     }
   }, [order, orderId, isAuthenticated, navigate]);
 

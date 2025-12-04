@@ -2,10 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const ProductCard = ({ product }) => {
-  const discount = Math.round((1 - product.price / product.oldPrice) * 100);
-
   const formatPrice = (price) => {
-    return price.toLocaleString('vi-VN') + 'đ';
+    return ((price || 0) * 1000).toLocaleString('vi-VN') + ' VND';
   };
 
   const styles = {
@@ -97,24 +95,22 @@ const ProductCard = ({ product }) => {
     >
       <div style={{ position: 'relative' }}>
         <img
-          src={product.image}
+          src={product.image || 'https://placehold.co/200x200/C5EFCB/647A67?text=Product'}
           alt={product.product_name}
           style={styles.productImage}
         />
-        <span style={styles.productBadge}>-{discount}%</span>
       </div>
       <div style={styles.productInfo}>
         <p style={styles.productName}>{product.product_name}</p>
         <div style={styles.productPriceRow}>
-          <span style={styles.productPrice}>{formatPrice(product.price)}</span>
-          <span style={styles.productOldPrice}>{formatPrice(product.oldPrice)}</span>
+          <span style={styles.productPrice}>{formatPrice(product.min_price)}</span>
         </div>
         <div style={styles.productFooter}>
           <div style={styles.productRating}>
             <span style={{ color: '#FFB800' }}>★</span>
-            <span>{product.rating}</span>
+            <span>{Number(product.avg_rating || 0).toFixed(1)}</span>
           </div>
-          <span>Đã bán {product.sold}</span>
+          <span>Sold {product.total_sold || 0}</span>
         </div>
       </div>
     </Link>

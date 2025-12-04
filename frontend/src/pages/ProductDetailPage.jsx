@@ -1,181 +1,150 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { getReviewsByProductId, getRatingDistribution } from '../mockData/mockReviews';
+import { useSelector, useDispatch } from 'react-redux';
+import { productService } from '../api/productService.js';
+import { cartService } from '../api/cartService.js';
+import { reviewService } from '../api/reviewService.js';
+import { fetchCart } from '../redux/slice/cart.slice.js';
+import createPrivateClient from '../clients/private.client.js';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useSelector(state => state.auth);
+  const dispatch = useDispatch();
+  const { user, isAuthenticated, token } = useSelector(state => state.auth);
+  const privateClient = useMemo(() => token ? createPrivateClient(dispatch) : null, [token, dispatch]);
   
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [hoveredItem, setHoveredItem] = useState(null);
-  const [reviewFilter, setReviewFilter] = useState('all'); // all, 5, 4, 3, 2, 1, hasImage
+  const [reviewFilter, setReviewFilter] = useState('all');
+  const [product, setProduct] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [addingToCart, setAddingToCart] = useState(false);
 
-  // Get reviews for this product
-  const productId = parseInt(id) || 1;
-  const reviews = getReviewsByProductId(productId);
-  const ratingDistribution = getRatingDistribution(productId);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [productRes, reviewsRes] = await Promise.all([
+          productService.getProductById(id),
+          reviewService.getReviews({ target_id: id, target_type: 'Product' })
+        ]);
+        
+        const productData = productRes.data?.data;
+        // Get unique images only (remove duplicates)
+        const allImages = [
+          productData?.image,
+          ...(productData?.variants?.map(v => v.image_url).filter(Boolean) || [])
+        ].filter(Boolean);
+        const productImages = [...new Set(allImages)]; // Remove duplicates
+
+        setProduct({
+          ...productData,
+          name: productData?.product_name,
+          category: productData?.category_name,
+          description: productData?.description || 'No description',
+          rating: productData?.avg_rating || 0,
+          reviewCount: productData?.review_count || 0,
+          sold: productData?.total_sold || 0,
+          price: productData?.variants?.[0]?.price || 0,
+          shop: productData?.shop_name,
+          images: productImages.length > 0 ? productImages : ['https://placehold.co/400x400/C5EFCB/647A67?text=Product']
+        });
+        setReviews(reviewsRes.data?.data?.reviews || []);
+        setSelectedVariant(productData?.variants?.[0] || null);
+      } catch (err) {
+        console.error('Error fetching product:', err);
+        setError('Failed to load product');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchData();
+    }
+  }, [id]);
+
   const avgRating = reviews.length > 0 
     ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) 
     : 0;
 
+  // Calculate rating distribution
+  const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  reviews.forEach(r => {
+    if (r.rating >= 1 && r.rating <= 5) {
+      ratingDistribution[r.rating]++;
+    }
+  });
+
   // Filter reviews
   const filteredReviews = reviews.filter(review => {
     if (reviewFilter === 'all') return true;
-    if (reviewFilter === 'hasImage') return review.images && review.images.length > 0;
+    if (reviewFilter === 'hasImage') return review.image_url && review.image_url.length > 0;
     return review.rating === parseInt(reviewFilter);
   });
 
-  // Mock product data - sau này sẽ fetch từ API theo id
-  const product = {
-    id: parseInt(id) || 1,
-    name: 'Áo thun nam cotton cao cấp Premium - Chất liệu mềm mại, thoáng mát, phù hợp mọi phong cách',
-    images: [
-      'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=600&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=600&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=600&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1562157873-818bc0726f68?w=600&h=600&fit=crop',
-    ],
-    price: 129000,
-    oldPrice: 299000,
-    discount: 57,
-    rating: 4.8,
-    reviewCount: 1234,
-    sold: 5678,
-    stock: 999,
-    category: 'Thời Trang Nam',
-    variants: {
-      colors: ['Trắng', 'Đen', 'Xám', 'Navy'],
-      sizes: ['S', 'M', 'L', 'XL', 'XXL']
-    },
-    shop: {
-      id: 1,
-      name: 'Cửa hàng Kim Tín',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=kimtin',
-      rating: 4.9,
-      responseRate: 98,
-      responseTime: 'trong vài phút',
-      followers: 12500,
-      products: 256,
-      joined: '2 năm trước'
-    },
-    description: `
-      <h3>Mô tả sản phẩm</h3>
-      <p>Áo thun nam cotton cao cấp với chất liệu 100% cotton tự nhiên, mềm mại và thoáng mát.</p>
-      <ul>
-        <li>Chất liệu: 100% Cotton cao cấp</li>
-        <li>Form áo: Regular fit, phù hợp mọi vóc dáng</li>
-        <li>Màu sắc: Đa dạng, không phai màu sau nhiều lần giặt</li>
-        <li>Kích thước: S - XXL</li>
-        <li>Xuất xứ: Việt Nam</li>
-      </ul>
-      <h3>Hướng dẫn bảo quản</h3>
-      <ul>
-        <li>Giặt máy ở chế độ nhẹ, nhiệt độ dưới 30°C</li>
-        <li>Không sử dụng chất tẩy mạnh</li>
-        <li>Phơi nơi thoáng mát, tránh ánh nắng trực tiếp</li>
-        <li>Ủi ở nhiệt độ thấp</li>
-      </ul>
-    `,
-    specifications: [
-      { label: 'Thương hiệu', value: 'ShopMart Fashion' },
-      { label: 'Xuất xứ', value: 'Việt Nam' },
-      { label: 'Chất liệu', value: '100% Cotton' },
-      { label: 'Kiểu dáng', value: 'Regular Fit' },
-      { label: 'Mùa phù hợp', value: 'Quanh năm' }
-    ]
-  };
+  if (loading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <h2>Loading product...</h2>
+      </div>
+    );
+  }
 
-  // Related products
-  const relatedProducts = [
-    {
-      id: 2,
-      name: 'Quần jean nam slim fit cao cấp',
-      image: 'https://images.unsplash.com/photo-1542272604-787c62d465d1?w=200&h=200&fit=crop',
-      price: 259000,
-      oldPrice: 499000,
-      discount: 48,
-      rating: 4.9,
-      sold: 876
-    },
-    {
-      id: 3,
-      name: 'Giày thể thao nam sneaker',
-      image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop',
-      price: 449000,
-      oldPrice: 899000,
-      discount: 50,
-      rating: 4.7,
-      sold: 543
-    },
-    {
-      id: 4,
-      name: 'Túi xách nam da PU cao cấp',
-      image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=200&h=200&fit=crop',
-      price: 199000,
-      oldPrice: 450000,
-      discount: 56,
-      rating: 4.6,
-      sold: 2103
-    },
-    {
-      id: 5,
-      name: 'Đồng hồ thông minh smartwatch',
-      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop',
-      price: 599000,
-      oldPrice: 1299000,
-      discount: 54,
-      rating: 4.9,
-      sold: 654
-    },
-    {
-      id: 6,
-      name: 'Nón lưỡi trai thể thao',
-      image: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=200&h=200&fit=crop',
-      price: 89000,
-      oldPrice: 159000,
-      discount: 44,
-      rating: 4.5,
-      sold: 3245
-    },
-    {
-      id: 7,
-      name: 'Kính mát thời trang nam',
-      image: 'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=200&h=200&fit=crop',
-      price: 149000,
-      oldPrice: 299000,
-      discount: 50,
-      rating: 4.4,
-      sold: 1876
-    }
-  ];
+  if (error || !product) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <h2>{error || 'Product not found'}</h2>
+        <button onClick={() => navigate(-1)}>Go Back</button>
+      </div>
+    );
+  }
 
-  const formatPrice = (price) => {
-    return price.toLocaleString('vi-VN') + 'đ';
-  };
-
-  const handleQuantityChange = (action) => {
-    if (action === 'increase' && quantity < product.stock) {
-      setQuantity(quantity + 1);
-    } else if (action === 'decrease' && quantity > 1) {
-      setQuantity(quantity - 1);
-    }
-  };
-
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!isAuthenticated) {
+      alert('Please sign in to add items to your cart');
       navigate('/signin');
       return;
     }
-    console.log('Add to cart:', { productId: product.id, quantity, variant: selectedVariant });
-    // Hiển thị thông báo thành công và hỏi có muốn xem giỏ hàng không
-    const goToCart = window.confirm('Đã thêm vào giỏ hàng! Bạn có muốn xem giỏ hàng không?');
-    if (goToCart) {
-      navigate('/cart');
+
+    try {
+      setAddingToCart(true);
+      const itemId = selectedVariant?.item_id || product.variants?.[0]?.item_id;
+      if (!itemId) {
+        alert('Please select a product variant');
+        return;
+      }
+
+      await cartService.addToCart(itemId, quantity, privateClient);
+      alert('Added to cart successfully!');
+      setQuantity(1);
+      // Refresh cart in Redux
+      if (privateClient) {
+        dispatch(fetchCart(privateClient));
+      }
+    } catch (err) {
+      console.error('Error adding to cart:', err);
+      alert('Error adding to cart');
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  const formatPrice = (price) => {
+    return ((price || 0) * 1000).toLocaleString('vi-VN') + ' VND';
+  };
+
+  const handleQuantityChange = (action) => {
+    const maxStock = selectedVariant?.stock || product.total_stock || 999;
+    if (action === 'increase' && quantity < maxStock) {
+      setQuantity(quantity + 1);
+    } else if (action === 'decrease' && quantity > 1) {
+      setQuantity(quantity - 1);
     }
   };
 
@@ -185,19 +154,24 @@ const ProductDetailPage = () => {
       return;
     }
     
-    // Tạo checkout item theo database schema (ProductItem)
+    // Go to checkout with selected variant
+    if (!selectedVariant && product.variants?.length > 0) {
+      alert('Please select a product variant');
+      return;
+    }
+
     const checkoutItem = {
-      item_id: product.id,
-      product_id: product.id,
-      product_name: product.name,
-      image_url: product.images[0],
-      color: selectedVariant?.color || product.variants.colors[0],
-      type: selectedVariant?.size || product.variants.sizes[0],
-      price: product.price,
+      item_id: selectedVariant?.item_id || product.variants?.[0]?.item_id,
+      product_id: product.product_id,
+      product_name: product.product_name,
+      image_url: product.images?.[0] || product.image,
+      color: selectedVariant?.color || '',
+      type: selectedVariant?.type || '',
+      price: selectedVariant?.price || product.min_price || product.price,
       quantity: quantity,
       shop: {
-        shop_id: product.shop.id,
-        shop_name: product.shop.name
+        shop_id: product.shop_id,
+        shop_name: product.shop_name
       }
     };
     
@@ -767,15 +741,31 @@ const ProductDetailPage = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div style={{ ...styles.page, justifyContent: 'center', alignItems: 'center', minHeight: '50vh', display: 'flex' }}>
+        <h2>Loading...</h2>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div style={{ ...styles.page, justifyContent: 'center', alignItems: 'center', minHeight: '50vh', display: 'flex' }}>
+        <h2>Error: {error || 'Product not found'}</h2>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page}>
       {/* Breadcrumb */}
       <nav style={styles.breadcrumb}>
-        <Link to="/" style={styles.breadcrumbLink}>Trang chủ</Link>
+        <Link to="/" style={styles.breadcrumbLink}>Home</Link>
         <span> › </span>
-        <Link to="/" style={styles.breadcrumbLink}>{product.category}</Link>
+        <Link to="/" style={styles.breadcrumbLink}>{product.category || 'Products'}</Link>
         <span> › </span>
-        <span style={{ color: '#3C433B' }}>{product.name.substring(0, 50)}...</span>
+        <span style={{ color: '#3C433B' }}>{product.name ? product.name.substring(0, 50) : 'Product'}...</span>
       </nav>
 
       <div style={styles.container}>
@@ -784,12 +774,12 @@ const ProductDetailPage = () => {
           {/* Image Gallery */}
           <div style={styles.imageGallery}>
             <img
-              src={product.images[selectedImage]}
+              src={product.images?.[selectedImage] || product.images?.[0] || 'https://placehold.co/400x400/C5EFCB/647A67?text=Product'}
               alt={product.name}
               style={styles.mainImage}
             />
             <div style={styles.thumbnails}>
-              {product.images.map((img, idx) => (
+              {(product.images || []).map((img, idx) => (
                 <img
                   key={idx}
                   src={img}
@@ -820,76 +810,60 @@ const ProductDetailPage = () => {
               </div>
               <span style={styles.divider}>|</span>
               <span style={styles.statsText}>
-                <strong>{product.reviewCount.toLocaleString()}</strong> Đánh Giá
+                <strong>{(product.reviewCount || 0).toLocaleString()}</strong> Review
               </span>
               <span style={styles.divider}>|</span>
               <span style={styles.statsText}>
-                <strong>{product.sold.toLocaleString()}</strong> Đã Bán
+                <strong>{(product.sold || 0).toLocaleString()}</strong> Sold
               </span>
             </div>
 
             {/* Price Section */}
             <div style={styles.priceSection}>
               <div style={styles.priceRow}>
-                <span style={styles.oldPrice}>{formatPrice(product.oldPrice)}</span>
-                <span style={styles.currentPrice}>{formatPrice(product.price)}</span>
-                <span style={styles.discountBadge}>-{product.discount}% GIẢM</span>
+                <span style={styles.currentPrice}>{selectedVariant ? formatPrice(selectedVariant.price) : formatPrice(product.price || 0)}</span>
               </div>
             </div>
 
-            {/* Variant - Color */}
-            <div style={styles.variantSection}>
-              <div style={styles.variantLabel}>Màu Sắc</div>
-              <div style={styles.variantOptions}>
-                {product.variants.colors.map((color, idx) => (
-                  <button
-                    key={idx}
-                    style={{
-                      ...styles.variantOption,
-                      ...(selectedVariant?.color === color ? styles.variantOptionActive : {})
-                    }}
-                    onClick={() => setSelectedVariant({ ...selectedVariant, color })}
-                    onMouseEnter={(e) => e.target.style.borderColor = '#647A67'}
-                    onMouseLeave={(e) => {
-                      if (selectedVariant?.color !== color) {
-                        e.target.style.borderColor = '#e0e0e0';
-                      }
-                    }}
-                  >
-                    {color}
-                  </button>
-                ))}
+            {/* Variant Selection */}
+            {product.variants && product.variants.length > 0 && (
+              <div style={styles.variantSection}>
+                <div style={styles.variantLabel}>Variant</div>
+                <div style={styles.variantOptions}>
+                  {product.variants.map((variant, idx) => (
+                    <button
+                      key={variant.item_id || idx}
+                      style={{
+                        ...styles.variantOption,
+                        ...(selectedVariant?.item_id === variant.item_id ? styles.variantOptionActive : {})
+                      }}
+                      onClick={() => {
+                        setSelectedVariant(variant);
+                        // Change image when selecting variant
+                        if (variant.image_url) {
+                          const imgIndex = product.images.findIndex(img => img === variant.image_url);
+                          if (imgIndex !== -1) {
+                            setSelectedImage(imgIndex);
+                          }
+                        }
+                      }}
+                      onMouseEnter={(e) => e.target.style.borderColor = '#647A67'}
+                      onMouseLeave={(e) => {
+                        if (selectedVariant?.item_id !== variant.item_id) {
+                          e.target.style.borderColor = '#e0e0e0';
+                        }
+                      }}
+                    >
+                      {variant.color} - {variant.type}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-
-            {/* Variant - Size */}
-            <div style={styles.variantSection}>
-              <div style={styles.variantLabel}>Kích Cỡ</div>
-              <div style={styles.variantOptions}>
-                {product.variants.sizes.map((size, idx) => (
-                  <button
-                    key={idx}
-                    style={{
-                      ...styles.variantOption,
-                      ...(selectedVariant?.size === size ? styles.variantOptionActive : {})
-                    }}
-                    onClick={() => setSelectedVariant({ ...selectedVariant, size })}
-                    onMouseEnter={(e) => e.target.style.borderColor = '#647A67'}
-                    onMouseLeave={(e) => {
-                      if (selectedVariant?.size !== size) {
-                        e.target.style.borderColor = '#e0e0e0';
-                      }
-                    }}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-            </div>
+            )}
 
             {/* Quantity */}
             <div style={styles.quantitySection}>
-              <span style={styles.quantityLabel}>Số Lượng</span>
+              <span style={styles.quantityLabel}>Quantity</span>
               <div style={styles.quantityControl}>
                 <button
                   style={styles.quantityBtn}
@@ -914,7 +888,7 @@ const ProductDetailPage = () => {
                   +
                 </button>
               </div>
-              <span style={styles.stockText}>{product.stock} sản phẩm có sẵn</span>
+              <span style={styles.stockText}>{selectedVariant?.stock || 0} products available</span>
             </div>
 
             {/* Action Buttons */}
@@ -925,7 +899,7 @@ const ProductDetailPage = () => {
                 onMouseEnter={(e) => e.target.style.backgroundColor = '#B8D2B3'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = '#C6DEC6'}
               >
-                🛒 Thêm Vào Giỏ Hàng
+                Add to Cart
               </button>
               <button
                 style={styles.buyNowBtn}
@@ -933,15 +907,15 @@ const ProductDetailPage = () => {
                 onMouseEnter={(e) => e.target.style.backgroundColor = '#556B5A'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = '#647A67'}
               >
-                Mua Ngay
+                Buy Now
               </button>
             </div>
 
             {/* Guarantee Icons */}
             <div style={{ display: 'flex', gap: '24px', fontSize: '13px', color: '#758173' }}>
-              <span>✓ Hoàn trả miễn phí 15 ngày</span>
-              <span>✓ Hàng chính hãng 100%</span>
-              <span>✓ Giao hàng miễn phí</span>
+              <span>✓ Free 15-day returns</span>
+              <span>✓ 100% Authentic Products</span>
+              <span>✓ Free Shipping</span>
             </div>
           </div>
         </div>
@@ -949,79 +923,59 @@ const ProductDetailPage = () => {
         {/* Shop Section */}
         <div style={styles.shopSection}>
           <div style={styles.shopInfo}>
-            <img
-              src={product.shop.avatar}
-              alt={product.shop.name}
-              style={styles.shopAvatar}
-            />
+            <div style={{
+              ...styles.shopAvatar,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '32px',
+              backgroundColor: '#C5EFCB'
+            }}>🏪</div>
             <div style={styles.shopDetails}>
-              <div style={styles.shopName}>{product.shop.name}</div>
-              <div style={styles.shopStatus}>Online {product.shop.responseTime}</div>
+              <div style={styles.shopName}>{product.shop_name || 'Shop'}</div>
+              <div style={styles.shopStatus}>Online</div>
               <div style={styles.shopButtons}>
                 <button
                   style={styles.shopBtn}
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#C6DEC6'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
                 >
-                  💬 Chat Ngay
+                  Chat Now
                 </button>
-                <button
-                  style={styles.shopBtn}
+                <Link
+                  to={`/shop/${product.shop_id}`}
+                  style={{ ...styles.shopBtn, textDecoration: 'none' }}
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#C6DEC6'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
                 >
-                  🏪 Xem Shop
-                </button>
+                  View Shop
+                </Link>
               </div>
             </div>
           </div>
           <div style={styles.shopStats}>
             <div style={styles.shopStat}>
-              <div style={styles.shopStatLabel}>Đánh Giá</div>
-              <div style={styles.shopStatValue}>{product.shop.rating}★</div>
+              <div style={styles.shopStatLabel}>Rating</div>
+              <div style={styles.shopStatValue}>{product.shop_rating || 5}★</div>
             </div>
             <div style={styles.shopStat}>
-              <div style={styles.shopStatLabel}>Tỉ Lệ Phản Hồi</div>
-              <div style={styles.shopStatValue}>{product.shop.responseRate}%</div>
-            </div>
-            <div style={styles.shopStat}>
-              <div style={styles.shopStatLabel}>Người Theo Dõi</div>
-              <div style={styles.shopStatValue}>{product.shop.followers.toLocaleString()}</div>
-            </div>
-            <div style={styles.shopStat}>
-              <div style={styles.shopStatLabel}>Sản Phẩm</div>
-              <div style={styles.shopStatValue}>{product.shop.products}</div>
+              <div style={styles.shopStatLabel}>Status</div>
+              <div style={styles.shopStatValue}>{product.shop_status || 'Active'}</div>
             </div>
           </div>
         </div>
 
-        {/* Product Specifications */}
-        <div style={styles.descriptionSection}>
-          <h2 style={styles.sectionTitle}>Chi Tiết Sản Phẩm</h2>
-          <table style={styles.specTable}>
-            <tbody>
-              {product.specifications.map((spec, idx) => (
-                <tr key={idx} style={styles.specRow}>
-                  <td style={styles.specLabel}>{spec.label}</td>
-                  <td style={styles.specValue}>{spec.value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
         {/* Product Description */}
         <div style={styles.descriptionSection}>
-          <h2 style={styles.sectionTitle}>Mô Tả Sản Phẩm</h2>
-          <div 
-            style={styles.descriptionContent}
-            dangerouslySetInnerHTML={{ __html: product.description }}
-          />
+          <h2 style={styles.sectionTitle}>Product Description</h2>
+          <div style={styles.descriptionContent}>
+            {product.description || 'No description available'}
+          </div>
         </div>
 
         {/* Product Reviews */}
         <div style={styles.reviewSection}>
-          <h2 style={styles.sectionTitle}>Đánh Giá Sản Phẩm</h2>
+          <h2 style={styles.sectionTitle}>Product Reviews</h2>
           
           {/* Review Header with Rating Overview */}
           <div style={styles.reviewHeader}>
@@ -1031,7 +985,7 @@ const ProductDetailPage = () => {
               <div style={styles.reviewStarsLarge}>
                 {'★'.repeat(Math.round(avgRating))}{'☆'.repeat(5 - Math.round(avgRating))}
               </div>
-              <div style={styles.reviewTotalCount}>{reviews.length} đánh giá</div>
+              <div style={styles.reviewTotalCount}>{reviews.length} reviews</div>
             </div>
 
             {/* Rating Distribution */}
@@ -1055,13 +1009,13 @@ const ProductDetailPage = () => {
             {/* Filters */}
             <div style={styles.reviewFilters}>
               {[
-                { key: 'all', label: 'Tất Cả' },
-                { key: '5', label: '5 Sao' },
-                { key: '4', label: '4 Sao' },
-                { key: '3', label: '3 Sao' },
-                { key: '2', label: '2 Sao' },
-                { key: '1', label: '1 Sao' },
-                { key: 'hasImage', label: 'Có Hình Ảnh' }
+                { key: 'all', label: 'All' },
+                { key: '5', label: '5 Stars' },
+                { key: '4', label: '4 Stars' },
+                { key: '3', label: '3 Stars' },
+                { key: '2', label: '2 Stars' },
+                { key: '1', label: '1 Star' },
+                { key: 'hasImage', label: 'With Images' }
               ].map(filter => (
                 <button
                   key={filter.key}
@@ -1087,7 +1041,7 @@ const ProductDetailPage = () => {
             {filteredReviews.length === 0 ? (
               <div style={styles.noReviews}>
                 <div style={{ fontSize: '48px', marginBottom: '12px' }}>📝</div>
-                <p>Chưa có đánh giá nào{reviewFilter !== 'all' ? ' cho bộ lọc này' : ''}</p>
+                <p>{reviewFilter !== 'all' ? 'No reviews for this filter' : 'No reviews yet'}</p>
               </div>
             ) : (
               filteredReviews.map(review => (
@@ -1111,14 +1065,14 @@ const ProductDetailPage = () => {
                     )}
                     <div style={styles.reviewUserInfo}>
                       <div style={styles.reviewUserName}>
-                        {review.is_anonymous ? 'Khách hàng ẩn danh' : review.customer_name}
+                        {review.is_anonymous ? 'Anonymous Customer' : review.customer_name}
                       </div>
                       <div style={styles.reviewStars}>
                         {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
                       </div>
                     </div>
                     <div style={styles.reviewDate}>
-                      {new Date(review.created_at).toLocaleDateString('vi-VN')}
+                      {new Date(review.created_at).toLocaleDateString('en-US')}
                     </div>
                   </div>
 
@@ -1146,10 +1100,10 @@ const ProductDetailPage = () => {
                     <div style={styles.reviewAttributes}>
                       {review.attributes.map((attr, idx) => {
                         const attrLabels = {
-                          quality: '✅ Chất lượng tốt',
-                          color: '🎨 Màu sắc đẹp',
-                          size: '📏 Vừa vặn',
-                          delivery: '🚚 Giao hàng nhanh'
+                          quality: 'Good Quality',
+                          color: 'Nice Color',
+                          size: 'Fits Well',
+                          delivery: 'Fast Delivery'
                         };
                         return (
                           <span key={idx} style={styles.reviewAttribute}>
@@ -1162,56 +1116,6 @@ const ProductDetailPage = () => {
                 </div>
               ))
             )}
-          </div>
-        </div>
-
-        {/* Related Products */}
-        <div style={styles.relatedSection}>
-          <h2 style={styles.sectionTitle}>Sản Phẩm Tương Tự</h2>
-          <div style={styles.productsGrid}>
-            {relatedProducts.map((item) => (
-              <Link
-                key={item.id}
-                to={`/product/${item.id}`}
-                style={styles.productCard}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <div style={{ position: 'relative' }}>
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    style={styles.productImage}
-                  />
-                  <span style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    backgroundColor: '#647A67',
-                    color: 'white',
-                    padding: '2px 6px',
-                    fontSize: '11px',
-                    fontWeight: '600',
-                    borderRadius: '2px'
-                  }}>
-                    -{item.discount}%
-                  </span>
-                </div>
-                <div style={styles.productInfo}>
-                  <p style={styles.productCardName}>{item.name}</p>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={styles.productCardPrice}>{formatPrice(item.price)}</span>
-                    <span style={styles.productCardSold}>Đã bán {item.sold}</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
           </div>
         </div>
       </div>

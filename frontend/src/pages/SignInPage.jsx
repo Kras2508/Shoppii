@@ -2,7 +2,6 @@ import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { loginUser } from '../redux/slice/auth.slice.js';
-import { getMockCredentials } from '../mockData/mockUsers.js';
 
 const SignInPage = () => {
   const dispatch = useDispatch();
@@ -14,8 +13,6 @@ const SignInPage = () => {
     password: '',
     role: 'Customer' // 'Customer', 'Shop' hoặc 'Admin'
   });
-
-  const [showCredentials, setShowCredentials] = React.useState(false);
 
   const styles = {
     page: {
@@ -151,35 +148,24 @@ const SignInPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const result = await dispatch(loginUser({
-      email: formData.email,
-      password: formData.password
-    }));
-    
-    if (result.payload && result.payload.user) {
-      // Login successful - redirect based on role
-      const userRole = result.payload.user.role;
+    try {
+      const result = await dispatch(loginUser({ email: formData.email, password: formData.password }));
       
-      // Redirect theo role thực của user
-      if (userRole === 'Admin') {
-        navigate('/admin');
-      } else if (userRole === 'Shop') {
-        navigate('/shop');
-      } else {
-        navigate('/');
+      if (result.payload && result.payload.user) {
+        // Login successful - redirect based on role
+        const userRole = result.payload.user.role;
+        
+        // Redirect theo role thực của user
+        if (userRole === 'Admin') {
+          navigate('/admin');
+        } else if (userRole === 'Shop') {
+          navigate('/shop');
+        } else {
+          navigate('/');
+        }
       }
-    }
-  };
-
-  const fillMockCredentials = (type) => {
-    const credentials = getMockCredentials();
-    const user = credentials.find(c => c.type === type);
-    if (user) {
-      setFormData({
-        email: user.email,
-        password: user.password,
-        role: type
-      });
+    } catch (err) {
+      console.error('Login error:', err);
     }
   };
 
@@ -219,7 +205,7 @@ const SignInPage = () => {
                   gap: '6px'
                 }}
               >
-                🛍️ Người mua
+                Customer
               </button>
               <button
                 type="button"
@@ -241,7 +227,7 @@ const SignInPage = () => {
                   gap: '6px'
                 }}
               >
-                🏪 Người bán
+                Shop
               </button>
               <button
                 type="button"
@@ -263,7 +249,7 @@ const SignInPage = () => {
                   gap: '6px'
                 }}
               >
-                🛡️ Admin
+                Admin
               </button>
             </div>
 
@@ -329,72 +315,6 @@ const SignInPage = () => {
               {status === 'loading' ? 'Đang đăng nhập...' : 'Sign in'}
             </button>
           </form>
-
-          {/* Mock Credentials for Testing */}
-          <div style={{
-            marginTop: '24px',
-            paddingTop: '20px',
-            borderTop: '1px solid #eee'
-          }}>
-            <button
-              type="button"
-              onClick={() => setShowCredentials(!showCredentials)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                fontSize: '12px',
-                backgroundColor: '#f0f0f0',
-                border: '1px solid #ddd',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                color: '#666',
-                marginBottom: '10px'
-              }}
-            >
-              {showCredentials ? '✕ Ẩn' : '📋 Tài khoản test'}
-            </button>
-
-            {showCredentials && (
-              <div style={{ fontSize: '12px' }}>
-                {getMockCredentials().map((cred, idx) => (
-                  <div key={idx} style={{
-                    backgroundColor: '#f9f9f9',
-                    padding: '10px',
-                    marginBottom: '8px',
-                    borderRadius: '6px',
-                    border: '1px solid #e0e0e0'
-                  }}>
-                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>{cred.type}</div>
-                    <div style={{ fontSize: '11px', color: '#666' }}>
-                      Email: {cred.email}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px' }}>
-                      Pass: {cred.password}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => fillMockCredentials(cred.type)}
-                      style={{
-                        width: '100%',
-                        padding: '6px',
-                        fontSize: '11px',
-                        backgroundColor: '#647A67',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#556B5A'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = '#647A67'}
-                    >
-                      Điền tài khoản này
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
           <div style={styles.divider}>Or</div>
 

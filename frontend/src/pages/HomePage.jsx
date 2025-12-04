@@ -1,10 +1,51 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { productService } from '../api/productService.js';
+import { categoryService } from '../api/categoryService.js';
+import { shopService } from '../api/shopService.js';
 
 const HomePage = () => {
   const [hoveredProduct, setHoveredProduct] = React.useState(null);
   const [currentSlide, setCurrentSlide] = React.useState(0);
   const [categorySlide, setCategorySlide] = React.useState(0);
+
+  // State for fetched data
+  const [categories, setCategories] = React.useState([]);
+  const [products, setProducts] = React.useState([]);
+  const [shops, setShops] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
+
+  // Fetch data on mount
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [categoriesRes, productsRes, shopsRes] = await Promise.all([
+          categoryService.getCategories(),
+          productService.getProducts({ limit: 20 }),
+          shopService.getShops({ limit: 10 })
+        ]);
+
+        const categoriesData = (categoriesRes.data?.data?.flat || []).map(cat => ({
+          ...cat,
+          id: cat.category_id,
+          name: cat.category_name
+        }));
+
+        setCategories(categoriesData);
+        setProducts(productsRes.data?.data?.products || []);
+        setShops(shopsRes.data?.data?.shops || []);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const styles = {
     page: {
@@ -178,16 +219,18 @@ const HomePage = () => {
       right: '8px',
       backgroundColor: '#FF6B6B',
       color: 'white',
-      padding: '4px 8px',
-      fontSize: '12px',
-      fontWeight: '600',
-      borderRadius: '4px'
+      padding: '6px 12px',
+      fontSize: '16px',
+      fontWeight: '700',
+      borderRadius: '6px',
+      boxShadow: '0 2px 8px rgba(255, 107, 107, 0.3)'
     },
     productInfo: {
       padding: '12px'
     },
     productName: {
-      fontSize: '14px',
+      fontSize: '16px',
+      fontWeight: '500',
       color: '#1F241F',
       marginBottom: '8px',
       overflow: 'hidden',
@@ -196,7 +239,7 @@ const HomePage = () => {
       WebkitLineClamp: 2,
       WebkitBoxOrient: 'vertical',
       lineHeight: '1.4',
-      height: '40px'
+      height: '45px'
     },
     productPriceRow: {
       display: 'flex',
@@ -205,8 +248,8 @@ const HomePage = () => {
       marginBottom: '8px'
     },
     productPrice: {
-      fontSize: '16px',
-      fontWeight: '600',
+      fontSize: '20px',
+      fontWeight: '700',
       color: '#647A67'
     },
     productOldPrice: {
@@ -279,158 +322,30 @@ const HomePage = () => {
     }
   };
 
-  const categories = [
-    { id: 1, name: 'Thời Trang Nam', icon: '👔' },
-    { id: 2, name: 'Thời Trang Nữ', icon: '👗' },
-    { id: 3, name: 'Điện Thoại', icon: '📱' },
-    { id: 4, name: 'Máy Tính', icon: '💻' },
-    { id: 5, name: 'Sắc Đẹp', icon: '💄' },
-    { id: 6, name: 'Nhà Cửa', icon: '🏠' },
-    { id: 7, name: 'Thể Thao', icon: '⚽' },
-    { id: 8, name: 'Đồ Chơi', icon: '🎮' },
-    { id: 9, name: 'Giày Dép', icon: '👟' },
-    { id: 10, name: 'Túi Xách', icon: '👜' },
-    { id: 11, name: 'Đồng Hồ', icon: '⌚' },
-    { id: 12, name: 'Kính Mắt', icon: '👓' },
-    { id: 13, name: 'Trang Sức', icon: '💍' },
-    { id: 14, name: 'Mỹ Phẩm', icon: '💅' },
-    { id: 15, name: 'Điện Gia Dụng', icon: '⚡' },
-    { id: 16, name: 'Dụng Cụ Nhà Bếp', icon: '🍳' },
-    { id: 17, name: 'Sách & Học Tập', icon: '📚' },
-    { id: 18, name: 'Du Lịch', icon: '✈️' },
-    { id: 19, name: 'Ô Tô - Xe Máy', icon: '🏍️' },
-    { id: 20, name: 'Thú Cưng', icon: '🐕' },
-    { id: 21, name: 'Nông Sản', icon: '🥕' },
-    { id: 22, name: 'Sức Khỏe', icon: '💊' }
-  ];
-
   const visibleCategories = categories.slice(categorySlide, categorySlide + 8);
 
-  const flashSaleProducts = [
-    {
-      id: 1,
-      name: 'Áo thun nam cotton cao cấp',
-      image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop',
-      price: '129.000đ',
-      oldPrice: '299.000đ',
-      discount: '-57%',
-      rating: 4.8,
-      sold: 1234
-    },
-    {
-      id: 2,
-      name: 'Quần jean nữ dáng ôm',
-      image: 'https://images.unsplash.com/photo-1542272604-787c62d465d1?w=200&h=200&fit=crop',
-      price: '259.000đ',
-      oldPrice: '499.000đ',
-      discount: '-48%',
-      rating: 4.9,
-      sold: 876
-    },
-    {
-      id: 3,
-      name: 'Giày thể thao nam sneaker',
-      image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop',
-      price: '449.000đ',
-      oldPrice: '899.000đ',
-      discount: '-50%',
-      rating: 4.7,
-      sold: 543
-    },
-    {
-      id: 4,
-      name: 'Túi xách nữ da PU cao cấp',
-      image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=200&h=200&fit=crop',
-      price: '199.000đ',
-      oldPrice: '450.000đ',
-      discount: '-56%',
-      rating: 4.6,
-      sold: 2103
-    },
-    {
-      id: 5,
-      name: 'Đồng hồ thông minh smartwatch',
-      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop',
-      price: '599.000đ',
-      oldPrice: '1.299.000đ',
-      discount: '-54%',
-      rating: 4.9,
-      sold: 654
-    },
-    {
-      id: 6,
-      name: 'Tai nghe bluetooth 5.0',
-      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200&h=200&fit=crop',
-      price: '149.000đ',
-      oldPrice: '399.000đ',
-      discount: '-63%',
-      rating: 4.5,
-      sold: 3245
-    }
-  ];
+  if (loading) {
+    return (
+      <div style={styles.page}>
+        <div style={{ ...styles.container, justifyContent: 'center', alignItems: 'center' }}>
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
+  }
 
-  const todayDeals = [
-    {
-      id: 7,
-      name: 'Balo laptop chống nước cao cấp',
-      image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=200&h=200&fit=crop',
-      price: '229.000đ',
-      oldPrice: '499.000đ',
-      discount: '-54%',
-      rating: 4.7,
-      sold: 432
-    },
-    {
-      id: 8,
-      name: 'Kem dưỡng da mặt vitamin C',
-      image: 'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=200&h=200&fit=crop',
-      price: '179.000đ',
-      oldPrice: '350.000đ',
-      discount: '-49%',
-      rating: 4.8,
-      sold: 876
-    },
-    {
-      id: 9,
-      name: 'Bình giữ nhiệt inox 500ml',
-      image: 'https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=200&h=200&fit=crop',
-      price: '99.000đ',
-      oldPrice: '199.000đ',
-      discount: '-50%',
-      rating: 4.6,
-      sold: 1543
-    },
-    {
-      id: 10,
-      name: 'Chuột gaming RGB LED',
-      image: 'https://images.unsplash.com/photo-1527814050087-3793815479db?w=200&h=200&fit=crop',
-      price: '129.000đ',
-      oldPrice: '299.000đ',
-      discount: '-57%',
-      rating: 4.7,
-      sold: 765
-    },
-    {
-      id: 11,
-      name: 'Dây cáp sạc nhanh Type-C',
-      image: 'https://images.unsplash.com/photo-1625948515291-69613efd103f?w=200&h=200&fit=crop',
-      price: '39.000đ',
-      oldPrice: '99.000đ',
-      discount: '-61%',
-      rating: 4.5,
-      sold: 5432
-    },
-    {
-      id: 12,
-      name: 'Ốp lưng điện thoại silicon',
-      image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=200&h=200&fit=crop',
-      price: '29.000đ',
-      oldPrice: '79.000đ',
-      discount: '-63%',
-      rating: 4.4,
-      sold: 9876
-    }
-  ];
+  if (error) {
+    return (
+      <div style={styles.page}>
+        <div style={{ ...styles.container, justifyContent: 'center', alignItems: 'center' }}>
+          <h2>Error: {error}</h2>
+        </div>
+      </div>
+    );
+  }
+
+  // Show all products in Today's Deals
+  const todayDeals = products.slice(0, 16);
 
   return (
     <div style={styles.page}>
@@ -448,7 +363,7 @@ const HomePage = () => {
       {/* Categories Section */}
       <section style={styles.categoriesSection}>
         <div style={styles.categoriesContainer}>
-          <h2 style={styles.categoriesTitle}>Danh Mục</h2>
+          <h2 style={styles.categoriesTitle}>Category</h2>
           <div style={styles.categorySliderWrapper}>
             <button
               style={{
@@ -463,9 +378,9 @@ const HomePage = () => {
             </button>
             <div style={styles.categorySliderContent}>
               <div style={styles.categorySliderTrack}>
-                {visibleCategories.map((category) => (
+                {visibleCategories.map((category, index) => (
                   <Link
-                    key={category.id}
+                    key={category.id || `cat-${index}`}
                     to={`/products?category=${category.id}`}
                     style={{
                       ...styles.categoryItem,
@@ -482,7 +397,7 @@ const HomePage = () => {
                     }}
                   >
                     <div className="category-icon" style={styles.categoryIcon}>
-                      {category.icon}
+                      {categorySlide + index + 1}
                     </div>
                     <span style={styles.categoryName}>{category.name}</span>
                   </Link>
@@ -504,128 +419,66 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Flash Sale Section */}
-      <section style={styles.flashSaleSection}>
-        <div style={styles.flashSaleContainer}>
-          <div style={styles.flashSaleHeader}>
-            <div style={styles.flashSaleTitle}>
-              <span style={styles.flashSaleTitleText}>⚡ FLASH SALE</span>
-              <div style={styles.flashSaleTimer}>
-                <span style={styles.timerBox}>02</span>
-                <span style={styles.timerSeparator}>:</span>
-                <span style={styles.timerBox}>34</span>
-                <span style={styles.timerSeparator}>:</span>
-                <span style={styles.timerBox}>56</span>
-              </div>
-            </div>
-            <Link to="/products?sale=flash-sale" style={styles.seeAllLink}>
-              Xem tất cả →
-            </Link>
-          </div>
-          <div style={styles.productsGrid}>
-            {flashSaleProducts.map((product) => (
-              <Link
-                key={product.id}
-                to={`/product/${product.id}`}
-                style={{ textDecoration: 'none' }}
-              >
-                <div
-                  style={styles.productCard}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-4px)';
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.1)';
-                    setHoveredProduct(product.id);
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                    setHoveredProduct(null);
-                  }}
-                >
-                  <div style={{ position: 'relative' }}>
-                    <img 
-                      src={product.image}
-                      alt={product.name}
-                      style={styles.productImage}
-                    />
-                    <span style={styles.productBadge}>{product.discount}</span>
-                  </div>
-                  <div style={styles.productInfo}>
-                    <p style={styles.productName}>{product.name}</p>
-                    <div style={styles.productPriceRow}>
-                      <span style={styles.productPrice}>{product.price}</span>
-                      <span style={styles.productOldPrice}>{product.oldPrice}</span>
-                    </div>
-                    <div style={styles.productFooter}>
-                      <div style={styles.productRating}>
-                        <span style={{ color: '#FFB800' }}>★</span>
-                        <span>{product.rating}</span>
-                      </div>
-                      <span style={styles.productSold}>Đã bán {product.sold}</span>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Today's Deals Section */}
       <section style={styles.dealsSection}>
         <div style={styles.dealsContainer}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <h2 style={{ ...styles.dealsTitle, marginBottom: 0 }}>Gợi Ý Hôm Nay</h2>
+            <h2 style={{ ...styles.dealsTitle, marginBottom: 0 }}>Today's Deals</h2>
             <Link to="/products?sale=today-deals" style={{ color: '#647A67', fontSize: '14px', textDecoration: 'none' }}>
-              Xem tất cả →
+              View more →
             </Link>
           </div>
-          <div style={styles.productsGrid}>
-            {todayDeals.map((product) => (
-              <Link
-                key={product.id}
-                to={`/product/${product.id}`}
-                style={{ textDecoration: 'none' }}
-              >
-                <div
-                  style={styles.productCard}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-4px)';
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.1)';
-                    setHoveredProduct(product.id);
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                    setHoveredProduct(null);
-                  }}
+          {/* Chỉ hiện products nếu có data hợp lệ */}
+          {todayDeals.filter(p => p.product_name && p.min_price).length > 0 ? (
+            <div style={styles.productsGrid}>
+              {todayDeals.filter(p => p.product_name && p.min_price).map((product, index) => (
+                <Link
+                  key={product.product_id || `deal-${index}`}
+                  to={`/product/${product.product_id}`}
+                  style={{ textDecoration: 'none' }}
                 >
-                  <div style={{ position: 'relative' }}>
-                    <img 
-                      src={product.image}
-                      alt={product.name}
-                      style={styles.productImage}
-                    />
-                    <span style={styles.productBadge}>{product.discount}</span>
-                  </div>
-                  <div style={styles.productInfo}>
-                    <p style={styles.productName}>{product.name}</p>
-                    <div style={styles.productPriceRow}>
-                      <span style={styles.productPrice}>{product.price}</span>
-                      <span style={styles.productOldPrice}>{product.oldPrice}</span>
+                  <div
+                    style={styles.productCard}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.1)';
+                      setHoveredProduct(product.product_id);
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                      setHoveredProduct(null);
+                    }}
+                  >
+                    <div style={{ position: 'relative' }}>
+                      <img 
+                        src={product.image || 'https://placehold.co/200x200/C5EFCB/647A67?text=Product'}
+                        alt={product.product_name}
+                        style={styles.productImage}
+                      />
                     </div>
-                    <div style={styles.productFooter}>
-                      <div style={styles.productRating}>
-                        <span style={{ color: '#FFB800' }}>★</span>
-                        <span>{product.rating}</span>
+                    <div style={styles.productInfo}>
+                      <p style={styles.productName}>{product.product_name}</p>
+                      <div style={styles.productPriceRow}>
+                        <span style={styles.productPrice}>{(Number(product.min_price) * 1000).toLocaleString('vi-VN')} VND</span>
                       </div>
-                      <span style={styles.productSold}>Đã bán {product.sold}</span>
+                      <div style={styles.productFooter}>
+                        <div style={styles.productRating}>
+                          <span style={{ color: '#FFB800' }}>★</span>
+                          <span>{Number(product.avg_rating || 0).toFixed(1)}</span>
+                        </div>
+                        <span style={styles.productSold}>Sold {product.total_sold || 0}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+              No recommended products yet
+            </div>
+          )}
         </div>
       </section>
     </div>

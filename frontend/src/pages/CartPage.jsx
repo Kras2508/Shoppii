@@ -1,107 +1,109 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { CartShopGroup, CartCheckoutFooter, EmptyCart } from './cart';
 import cartStyles from './cart/cartStyles';
+import { fetchCart } from '../redux/slice/cart.slice.js';
+import createPrivateClient from '../clients/private.client.js';
 
 const CartPage = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useSelector(state => state.auth);
+  const dispatchRedux = useDispatch();
+  const { user, isAuthenticated, token } = useSelector(state => state.auth);
+  const { shops: reduxShops, loading: reduxLoading } = useSelector(state => state.cart);
+  const privateClient = useMemo(() => token ? createPrivateClient(dispatchRedux) : null, [token, dispatchRedux]);
 
-  // Mock cart data
-  const [cartItems, setCartItems] = useState([
-    {
-      id: 1,
-      productId: 1,
-      name: 'Áo thun nam cotton cao cấp Premium',
-      image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop',
-      price: 129000,
-      oldPrice: 299000,
-      variant: { color: 'Trắng', size: 'L' },
-      quantity: 2,
-      stock: 99,
-      shop: {
-        id: 1,
-        name: 'Cửa hàng Kim Tín'
-      },
-      selected: true
-    },
-    {
-      id: 2,
-      productId: 3,
-      name: 'Giày thể thao nam sneaker',
-      image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop',
-      price: 449000,
-      oldPrice: 899000,
-      variant: { color: 'Đỏ', size: '42' },
-      quantity: 1,
-      stock: 50,
-      shop: {
-        id: 1,
-        name: 'Cửa hàng Kim Tín'
-      },
-      selected: true
-    },
-    {
-      id: 3,
-      productId: 5,
-      name: 'Đồng hồ thông minh smartwatch',
-      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop',
-      price: 599000,
-      oldPrice: 1299000,
-      variant: { color: 'Đen' },
-      quantity: 1,
-      stock: 30,
-      shop: {
-        id: 2,
-        name: 'Tech Store VN'
-      },
-      selected: false
+  const [selectedItems, setSelectedItems] = useState(new Set());
+
+  // Fetch cart on mount or when token changes
+  useEffect(() => {
+    if (isAuthenticated && privateClient) {
+      console.log('📄 CartPage: Fetching cart');
+      dispatchRedux(fetchCart(privateClient));
     }
-  ]);
+  }, [isAuthenticated, privateClient, dispatchRedux]);
+
+  if (!isAuthenticated) {
+    return (
+      <div style={{ ...cartStyles.page, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h2>Please log in to view your cart</h2>
+          <button onClick={() => navigate('/signin')}>Log In</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (reduxLoading) {
+    return (
+      <div style={{ ...cartStyles.page, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <h2>Loading cart...</h2>
+      </div>
+    );
+  }
+
+  if (!reduxShops || reduxShops.length === 0) {
+    return (
+      <div style={cartStyles.page}>
+        <div style={cartStyles.container}>
+          <h1 style={cartStyles.pageTitle}>Cart</h1>
+          <EmptyCart styles={cartStyles} />
+        </div>
+      </div>
+    );
+  }
 
   const handleQuantityChange = (itemId, action) => {
-    setCartItems(items =>
-      items.map(item => {
-        if (item.id === itemId) {
-          if (action === 'increase' && item.quantity < item.stock) {
-            return { ...item, quantity: item.quantity + 1 };
-          } else if (action === 'decrease' && item.quantity > 1) {
-            return { ...item, quantity: item.quantity - 1 };
-          }
-        }
-        return item;
-      })
-    );
+    // This will need to be handled via API
+    console.log('Quantity change:', itemId, action);
   };
 
   const handleSelectItem = (itemId) => {
-    setCartItems(items =>
-      items.map(item =>
-        item.id === itemId ? { ...item, selected: !item.selected } : item
-      )
-    );
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
   };
 
   const handleSelectAll = () => {
-    const allSelected = cartItems.every(item => item.selected);
-    setCartItems(items =>
-      items.map(item => ({ ...item, selected: !allSelected }))
-    );
+    const allItemIds = new Set();
+    reduxShops.forEach(shop => {
+      shop.items?.forEach(item => {
+        allItemIds.add(item.item_id);
+      });
+    });
+    
+    if (allItemIds.size === selectedItems.size) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(allItemIds);
+    }
   };
 
   const handleSelectShop = (shopId) => {
-    const shopItems = cartItems.filter(item => item.shop.id === shopId);
-    const allShopSelected = shopItems.every(item => item.selected);
-    setCartItems(items =>
-      items.map(item =>
-        item.shop.id === shopId ? { ...item, selected: !allShopSelected } : item
-      )
-    );
+    const shopItems = reduxShops.find(s => s.shop_id === shopId)?.items || [];
+    const shopItemIds = new Set(shopItems.map(item => item.item_id));
+    
+    // Check if all items in this shop are selected
+    const allSelected = shopItems.every(item => selectedItems.has(item.item_id));
+    
+    const newSet = new Set(selectedItems);
+    if (allSelected) {
+      shopItemIds.forEach(id => newSet.delete(id));
+    } else {
+      shopItemIds.forEach(id => newSet.add(id));
+    }
+    setSelectedItems(newSet);
   };
 
   const handleRemoveItem = (itemId) => {
-    setCartItems(items => items.filter(item => item.id !== itemId));
+    // This will need to be handled via API
+    console.log('Remove item:', itemId);
   };
 
   const handleCheckout = () => {
@@ -109,77 +111,55 @@ const CartPage = () => {
       navigate('/signin');
       return;
     }
-    const selectedItems = cartItems.filter(item => item.selected);
-    if (selectedItems.length === 0) {
-      alert('Vui lòng chọn sản phẩm để thanh toán');
+    
+    if (selectedItems.size === 0) {
+      alert('Please select products to checkout');
       return;
     }
     
-    const checkoutItems = selectedItems.map(item => ({
-      item_id: item.id,
-      product_id: item.productId,
-      product_name: item.name,
-      image_url: item.image,
-      color: item.variant?.color || '',
-      type: item.variant?.size || '',
-      price: item.price,
-      quantity: item.quantity,
-      shop: {
-        shop_id: item.shop.id,
-        shop_name: item.shop.name
-      }
-    }));
+    const checkoutItems = [];
+    reduxShops.forEach(shop => {
+      shop.items?.forEach(item => {
+        if (selectedItems.has(item.item_id)) {
+          checkoutItems.push({
+            item_id: item.item_id,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            image_url: item.variant_image || item.product_image,
+            color: item.color || '',
+            type: item.type || '',
+            price: item.price,
+            quantity: item.quantity,
+            shop: {
+              shop_id: shop.shop_id,
+              shop_name: shop.shop_name
+            }
+          });
+        }
+      });
+    });
     
     navigate('/checkout', { state: { items: checkoutItems } });
   };
 
-  // Group items by shop
-  const groupedByShop = cartItems.reduce((acc, item) => {
-    const shopId = item.shop.id;
-    if (!acc[shopId]) {
-      acc[shopId] = {
-        shop: item.shop,
-        items: []
-      };
-    }
-    acc[shopId].items.push(item);
-    return acc;
-  }, {});
-
-  const selectedItems = cartItems.filter(item => item.selected);
-
-  if (cartItems.length === 0) {
-    return (
-      <div style={cartStyles.page}>
-        <div style={cartStyles.container}>
-          <h1 style={cartStyles.pageTitle}>Giỏ Hàng</h1>
-          <EmptyCart styles={cartStyles} />
-        </div>
-      </div>
-    );
-  }
+  const totalItems = reduxShops.reduce((sum, shop) => sum + (shop.items?.length || 0), 0);
 
   return (
     <div style={cartStyles.page}>
       <div style={cartStyles.container}>
-        <h1 style={cartStyles.pageTitle}>Giỏ Hàng ({cartItems.length} sản phẩm)</h1>
-
-        {/* Cart Header */}
-        <div style={cartStyles.cartHeader}>
-          <div></div>
-          <div>Sản Phẩm</div>
-          <div style={{ textAlign: 'center' }}>Đơn Giá</div>
-          <div style={{ textAlign: 'center' }}>Số Lượng</div>
-          <div style={{ textAlign: 'center' }}>Số Tiền</div>
-          <div style={{ textAlign: 'center' }}>Thao Tác</div>
-        </div>
+        <h1 style={cartStyles.pageTitle}>Cart ({totalItems} items)</h1>
 
         {/* Cart Items grouped by Shop */}
-        {Object.values(groupedByShop).map(({ shop, items }) => (
+        {reduxShops.map((shop) => (
           <CartShopGroup
-            key={shop.id}
-            shop={shop}
-            items={items}
+            key={shop.shop_id}
+            shop={{
+              id: shop.shop_id,
+              name: shop.shop_name,
+              status: shop.shop_status
+            }}
+            items={shop.items || []}
+            selectedItems={selectedItems}
             onQuantityChange={handleQuantityChange}
             onSelect={handleSelectItem}
             onRemove={handleRemoveItem}
@@ -191,8 +171,9 @@ const CartPage = () => {
 
       {/* Checkout Footer */}
       <CartCheckoutFooter
-        cartItems={cartItems}
-        selectedItems={selectedItems}
+        cartItems={reduxShops}
+        selectedItems={Array.from(selectedItems)}
+        selectedCount={selectedItems.size}
         onSelectAll={handleSelectAll}
         onCheckout={handleCheckout}
         styles={cartStyles}

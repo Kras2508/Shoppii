@@ -1,21 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import shopStyles from './shopStyles';
+import { shopService } from '../../api/shopService';
+import createPrivateClient from '../../clients/private.client';
 
 const ShopSettingsPage = () => {
-  const { user } = useSelector(state => state.auth);
+  const { user, token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
   
-  // Mock shop data - in real app, fetch from API
   const [shopData, setShopData] = useState({
-    shop_name: user?.shop_name || 'Cửa hàng Kim Tín',
-    shop_phone: user?.shop_phone || '0283456789',
-    address_shop: user?.address_shop || '456 Đường Lê Lợi, Quận 1, TP.HCM',
-    email: user?.email || 'shop@gmail.com',
-    description: 'Chuyên cung cấp các sản phẩm thời trang chất lượng cao với giá cả phải chăng. Cam kết 100% hàng chính hãng.',
-    shop_status: user?.shop_status || 'Open',
+    shop_name: '',
+    shop_phone: '',
+    address_shop: '',
+    email: '',
+    description: '',
+    shop_status: 'Open',
     logo: 'https://api.dicebear.com/7.x/initials/svg?seed=Shop',
     banner: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&h=300&fit=crop'
   });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchShopData = async () => {
+      try {
+        setLoading(true);
+        const response = await shopService.getShopDashboard(privateClient);
+        if (response.data?.data?.shop) {
+          const shop = response.data.data.shop;
+          setShopData({
+            shop_name: shop.shop_name || '',
+            shop_phone: shop.shop_phone || '',
+            address_shop: shop.address_shop || '',
+            email: shop.email || user?.email || '',
+            description: shop.description || '',
+            shop_status: shop.shop_status || 'Open',
+            logo: shop.logo || 'https://api.dicebear.com/7.x/initials/svg?seed=Shop',
+            banner: shop.banner || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&h=300&fit=crop'
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching shop data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchShopData();
+  }, [token]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(shopData);
@@ -181,11 +211,21 @@ const ShopSettingsPage = () => {
     setEditData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = () => {
-    setShopData(editData);
-    setIsEditing(false);
-    // In real app, call API to save
-    alert('Đã lưu thay đổi!');
+  const handleSave = async () => {
+    try {
+      await shopService.updateShopProfile({
+        shop_name: editData.shop_name,
+        shop_phone: editData.shop_phone,
+        address_shop: editData.address_shop,
+        shop_status: editData.shop_status
+      }, privateClient);
+      setShopData(editData);
+      setIsEditing(false);
+      alert('Đã lưu thay đổi!');
+    } catch (err) {
+      console.error('Error saving shop data:', err);
+      alert('Không thể lưu thay đổi. Vui lòng thử lại!');
+    }
   };
 
   const handleCancel = () => {

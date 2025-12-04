@@ -1,42 +1,59 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import shopStyles from './shopStyles';
+import { shopService } from '../../api/shopService';
+import createPrivateClient from '../../clients/private.client';
 
 const ShopDashboardPage = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useSelector(state => state.auth);
+  const { user, isAuthenticated, token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
 
-  // Mock shop data
-  const shopData = {
-    shop_id: 1,
-    shop_name: user?.full_name ? `Shop của ${user.full_name}` : 'Shop của tôi',
-    rating: 4.8,
-    followers: 1250,
-    totalProducts: 24,
-    totalOrders: 156,
-    totalRevenue: 45680000,
-    pendingOrders: 5,
-    processingOrders: 12,
-    completedOrders: 139
-  };
+  const [shopData, setShopData] = useState(null);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock recent orders
-  const recentOrders = [
-    { order_id: 1001, customer: 'Nguyễn Văn A', total: 258000, status: 'Processing', date: '2024-12-01' },
-    { order_id: 1002, customer: 'Trần Thị B', total: 459000, status: 'Shipped', date: '2024-12-01' },
-    { order_id: 1003, customer: 'Lê Văn C', total: 129000, status: 'Pending', date: '2024-11-30' },
-    { order_id: 1004, customer: 'Phạm Thị D', total: 789000, status: 'Delivered', date: '2024-11-30' },
-  ];
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/signin');
+      return;
+    }
 
-  // Mock top products
-  const topProducts = [
-    { id: 1, name: 'Áo thun nam cotton cao cấp', sold: 234, revenue: 30186000 },
-    { id: 2, name: 'Quần jean nam slim fit', sold: 156, revenue: 40404000 },
-    { id: 3, name: 'Giày thể thao sneaker', sold: 98, revenue: 44002000 },
-  ];
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true);
+        const response = await shopService.getShopDashboard(privateClient);
+        if (response.data?.data) {
+          const data = response.data.data;
+          setShopData({
+            shop_id: data.shop?.shop_id,
+            shop_name: data.shop?.shop_name || `Shop của ${user?.full_name}`,
+            rating: data.shop?.rating || 0,
+            followers: data.shop?.followers || 0,
+            totalProducts: data.stats?.products?.total_products || 0,
+            totalOrders: data.stats?.orders?.total_orders || 0,
+            totalRevenue: data.stats?.total_revenue || 0,
+            pendingOrders: data.stats?.orders?.processing || 0,
+            processingOrders: data.stats?.orders?.shipped || 0,
+            completedOrders: data.stats?.orders?.delivered || 0
+          });
+          setRecentOrders(data.recent_orders || []);
+          setTopProducts(data.top_products || []);
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard:', err);
+        setError('Không thể tải dữ liệu dashboard');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, [isAuthenticated, navigate, token]);
 
-  const formatPrice = (price) => price.toLocaleString('vi-VN') + 'đ';
+  const formatPrice = (price) => Number(price || 0).toLocaleString('vi-VN') + 'đ';
 
   const getStatusStyle = (status) => {
     switch (status) {
@@ -51,6 +68,28 @@ const ShopDashboardPage = () => {
   if (!isAuthenticated) {
     navigate('/signin');
     return null;
+  }
+
+  if (loading) {
+    return (
+      <div style={shopStyles.page}>
+        <div style={{ textAlign: 'center', padding: '60px' }}>
+          <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
+          <p>Đang tải dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !shopData) {
+    return (
+      <div style={shopStyles.page}>
+        <div style={{ textAlign: 'center', padding: '60px' }}>
+          <div style={{ fontSize: '32px', marginBottom: '16px' }}>❌</div>
+          <p>{error || 'Không tìm thấy dữ liệu shop'}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -120,8 +159,8 @@ const ShopDashboardPage = () => {
                 {recentOrders.map(order => (
                   <tr key={order.order_id}>
                     <td style={shopStyles.td}>#{order.order_id}</td>
-                    <td style={shopStyles.td}>{order.customer}</td>
-                    <td style={shopStyles.td}>{formatPrice(order.total)}</td>
+                    <td style={shopStyles.td}>{order.customer_name || 'Khách hàng'}</td>
+                    <td style={shopStyles.td}>{formatPrice(order.total_amount)}</td>
                     <td style={shopStyles.td}>
                       <span style={getStatusStyle(order.status)}>
                         {order.status}
@@ -129,6 +168,13 @@ const ShopDashboardPage = () => {
                     </td>
                   </tr>
                 ))}
+                {recentOrders.length === 0 && (
+                  <tr>
+                    <td colSpan="4" style={{ ...shopStyles.td, textAlign: 'center', color: '#999' }}>
+                      Chưa có đơn hàng nào
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -138,7 +184,7 @@ const ShopDashboardPage = () => {
             <h2 style={shopStyles.cardTitle}>🏆 Sản phẩm bán chạy</h2>
             
             {topProducts.map((product, index) => (
-              <div key={product.id} style={{
+              <div key={product.product_id} style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
@@ -161,14 +207,14 @@ const ShopDashboardPage = () => {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '14px', fontWeight: '500', color: '#333' }}>
-                    {product.name}
+                    {product.product_name}
                   </div>
                   <div style={{ fontSize: '12px', color: '#999' }}>
-                    Đã bán: {product.sold}
+                    Đã bán: {product.total_sold || 0}
                   </div>
                 </div>
                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#647A67' }}>
-                  {formatPrice(product.revenue)}
+                  {formatPrice(product.total_revenue || 0)}
                 </div>
               </div>
             ))}

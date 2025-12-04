@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import {
   CheckoutVoucherSection,
   CheckoutProductsSection,
@@ -9,11 +9,18 @@ import {
   CheckoutSummary
 } from './checkout';
 import checkoutStyles from './checkout/checkoutStyles';
+import { cartService } from '../api/cartService.js';
+import { orderService } from '../api/orderService.js';
+import { shippingService } from '../api/shippingService.js';
+import { voucherService } from '../api/voucherService.js';
+import createPrivateClient from '../clients/private.client.js';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const location = useLocation();
-  const { user, isAuthenticated } = useSelector(state => state.auth);
+  const { user, isAuthenticated, token } = useSelector(state => state.auth);
+  const privateClient = token ? createPrivateClient(dispatch) : null;
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -22,109 +29,65 @@ const CheckoutPage = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Get checkout items from location state or use default
-  const [checkoutItems] = useState(location.state?.items || [
-    {
-      item_id: 1,
-      product_id: 1,
-      product_name: 'Áo thun nam cotton cao cấp Premium',
-      image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop',
-      color: 'Trắng',
-      type: 'L',
-      price: 129000,
-      quantity: 2,
-      shop: {
-        shop_id: 1,
-        shop_name: 'Cửa hàng Kim Tín'
-      }
-    },
-    {
-      item_id: 2,
-      product_id: 3,
-      product_name: 'Giày thể thao nam sneaker',
-      image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop',
-      color: 'Đỏ',
-      type: '42',
-      price: 449000,
-      quantity: 1,
-      shop: {
-        shop_id: 1,
-        shop_name: 'Cửa hàng Kim Tín'
-      }
-    }
-  ]);
-
-  // Shipping options
-  const shippingOptions = [
-    {
-      shipping_id: 1,
-      name: 'Giao hàng tiêu chuẩn',
-      estimated_days: 5,
-      fee: 30000,
-      status: 'Active'
-    },
-    {
-      shipping_id: 2,
-      name: 'Giao hàng nhanh',
-      estimated_days: 2,
-      fee: 50000,
-      status: 'Active'
-    },
-    {
-      shipping_id: 3,
-      name: 'Giao hỏa tốc',
-      estimated_days: 1,
-      fee: 80000,
-      status: 'Active'
-    }
-  ];
-
-  // Vouchers
-  const availableVouchers = [
-    {
-      voucher_id: 1,
-      code: 'GIAM10',
-      discount_type: 'Percentage',
-      discount_value: 10,
-      min_order_value: 200000,
-      expired_date: '2025-12-31',
-      usage_limit: 100,
-      used_count: 45,
-      status: 'Active'
-    },
-    {
-      voucher_id: 2,
-      code: 'GIAM50K',
-      discount_type: 'Amount',
-      discount_value: 50000,
-      min_order_value: 500000,
-      expired_date: '2025-12-31',
-      usage_limit: 50,
-      used_count: 20,
-      status: 'Active'
-    }
-  ];
-
-  // Payment methods
-  const paymentMethods = [
-    { id: 'COD', name: 'Thanh toán khi nhận hàng (COD)', icon: '💵' },
-    { id: 'Banking', name: 'Chuyển khoản ngân hàng', icon: '🏦' },
-    { id: 'Momo', name: 'Ví MoMo', icon: '📱' },
-    { id: 'ZaloPay', name: 'ZaloPay', icon: '💳' }
-  ];
-
-  // State
-  const [shippingAddress, setShippingAddress] = useState(user?.address || '');
-  const [selectedShipping, setSelectedShipping] = useState(shippingOptions[0]);
+  // States
+  const [checkoutItems, setCheckoutItems] = useState(location.state?.items || []);
+  const [shippingOptions, setShippingOptions] = useState([]);
+  const [vouchers, setVouchers] = useState([]);
+  const [selectedShipping, setSelectedShipping] = useState(null);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [selectedPayment, setSelectedPayment] = useState('COD');
+  const [shippingAddress, setShippingAddress] = useState(user?.address || '');
   const [voucherCode, setVoucherCode] = useState('');
   const [showVoucherDropdown, setShowVoucherDropdown] = useState(false);
   const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // Fetch shipping methods and vouchers
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // If no items from location state, fetch from cart
+        if (checkoutItems.length === 0 && privateClient) {
+          const cartRes = await cartService.getCart(privateClient);
+          setCheckoutItems(cartRes.data?.data?.items || []);
+        }
+        
+        // Fetch shipping methods
+        const shippingRes = await shippingService.getShippingMethods();
+        const shippingData = shippingRes.data?.data || [];
+        setShippingOptions(shippingData);
+        if (shippingData.length > 0) {
+          setSelectedShipping(shippingData[0]);
+        }
+
+        // Fetch vouchers
+        const voucherRes = await voucherService.getVouchers();
+        setVouchers(voucherRes.data?.data || []);
+      } catch (err) {
+        console.error('Error fetching checkout data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchData();
+    }
+  }, [isAuthenticated]);
+
+  // Payment methods
+  const paymentMethods = [
+    { id: 'COD', name: 'Cash on Delivery (COD)', icon: '💵' },
+    { id: 'Banking', name: 'Bank Transfer', icon: '🏦' },
+    { id: 'Momo', name: 'MoMo Wallet', icon: '📱' },
+    { id: 'ZaloPay', name: 'ZaloPay', icon: '💳' }
+  ];
 
   // Calculations
-  const subtotal = checkoutItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shippingFee = selectedShipping.fee;
+  const subtotal = checkoutItems.reduce((sum, item) => sum + ((item.price_at_purchase || item.price) * item.quantity), 0);
+  const shippingFee = selectedShipping?.fee || 0;
   
   const calculateDiscount = () => {
     if (!selectedVoucher) return 0;
@@ -141,102 +104,71 @@ const CheckoutPage = () => {
   const totalAmount = subtotal + shippingFee - discount;
 
   const formatPrice = (price) => {
-    return price.toLocaleString('vi-VN') + 'đ';
+    return (price || 0).toLocaleString('vi-VN') + 'đ';
   };
 
-  const handleApplyVoucher = (voucher = null) => {
-    if (voucher) {
-      if (subtotal < voucher.min_order_value) {
-        alert(`Đơn hàng tối thiểu ${formatPrice(voucher.min_order_value)} để sử dụng voucher này`);
-        return;
-      }
-      setSelectedVoucher(voucher);
-      setShowVoucherDropdown(false);
-    } else {
-      const foundVoucher = availableVouchers.find(v => 
-        v.code.toUpperCase() === voucherCode.toUpperCase() && 
-        v.status === 'Active' &&
-        v.used_count < v.usage_limit
-      );
+  const handleApplyVoucher = () => {
+    if (voucherCode.trim()) {
+      const foundVoucher = vouchers.find(v => v.code.toLowerCase() === voucherCode.toLowerCase());
       
       if (foundVoucher) {
         if (subtotal < foundVoucher.min_order_value) {
-          alert(`Đơn hàng tối thiểu ${formatPrice(foundVoucher.min_order_value)} để sử dụng voucher này`);
+          alert(`Minimum order ${formatPrice(foundVoucher.min_order_value)} to use this voucher`);
           return;
         }
         setSelectedVoucher(foundVoucher);
         setShowVoucherDropdown(false);
       } else {
-        alert('Mã voucher không hợp lệ hoặc đã hết lượt sử dụng');
+        alert('Invalid voucher code or usage limit reached');
       }
     }
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (!shippingAddress.trim()) {
-      alert('Vui lòng nhập địa chỉ giao hàng');
+      alert('Please enter a shipping address');
       return;
     }
 
-    // Generate a mock order ID
-    const orderId = Date.now();
+    try {
+      const orderData = {
+        shipping_id: selectedShipping?.shipping_id,
+        voucher_id: selectedVoucher?.voucher_id || null,
+        payment_method: selectedPayment,
+        shipping_address: user?.address || shippingAddress,
+        note: note
+      };
 
-    const orderData = {
-      order_id: orderId,
-      customer_id: user?.id,
-      customer_name: user?.name || 'Khách hàng',
-      shipping_id: selectedShipping.shipping_id,
-      voucher_id: selectedVoucher?.voucher_id || null,
-      status: 'Processing',
-      shipping_address: shippingAddress,
-      shipping_method: selectedShipping,
-      total_price: totalAmount,
-      subtotal: subtotal,
-      shipping_fee: shippingFee,
-      discount: discount,
-      payment_method: selectedPayment,
-      voucher: selectedVoucher,
-      note: note,
-      created_at: new Date().toISOString(),
-      items: checkoutItems.map(item => {
-        // Calculate price_at_purchase: giá sau khi áp dụng giảm giá (chia đều cho các item)
-        const discountPerItem = discount / checkoutItems.reduce((sum, i) => sum + i.quantity, 0);
-        const priceAfterDiscount = item.price - discountPerItem;
-        
-        return {
-          order_item_id: Date.now() + Math.random(),
-          variantID: item.item_id, // theo database schema
-          product_id: item.product_id,
-          product_name: item.product_name,
-          image_url: item.image_url,
-          color: item.color,
-          type: item.type,
-          quantity: item.quantity,
-          price: item.price, // giá gốc
-          price_at_purchase: priceAfterDiscount > 0 ? priceAfterDiscount : item.price, // giá sau giảm
-          shop_id: item.shop.shop_id,
-          shop_name: item.shop.shop_name
-        };
-      })
-    };
-
-    console.log('Order data:', orderData);
-    
-    // Navigate to order confirmation page
-    navigate(`/order/confirmation/${orderId}`, { 
-      state: { 
-        order: orderData, 
-        isNewOrder: true 
-      } 
-    });
+      const response = await orderService.createOrder(orderData, privateClient);
+      
+      if (response.data?.success) {
+        navigate('/order-confirmation/' + response.data.data.order_id, {
+          state: {
+            order: {
+              ...response.data.data,
+              items: checkoutItems,
+              shipping: selectedShipping,
+              voucher: selectedVoucher,
+              subtotal,
+              shipping_fee: shippingFee,
+              discount,
+              total_amount: totalAmount
+            }
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error placing order:', err);
+      alert('Error placing order: ' + (err.response?.data?.message || err.message));
+    }
   };
 
   // Group items by shop
   const groupedByShop = checkoutItems.reduce((acc, item) => {
-    const shopId = item.shop.shop_id;
+    const shopId = item.shop?.shop_id || item.shop_id;
     if (!acc[shopId]) {
       acc[shopId] = {
-        shop: item.shop,
+        shop: item.shop || { shop_id: shopId, shop_name: item.shop_name },
         items: []
       };
     }
@@ -259,7 +191,7 @@ const CheckoutPage = () => {
             {/* Shipping Address */}
             <div style={checkoutStyles.section}>
               <h2 style={checkoutStyles.sectionTitle}>
-                <span>📍</span> Địa Chỉ Nhận Hàng
+                <span>📍</span> Shipping Address
               </h2>
               <div style={checkoutStyles.userInfo}>
                 <span><strong>{user?.fullName || user?.full_name}</strong></span>
@@ -267,7 +199,7 @@ const CheckoutPage = () => {
               </div>
               <input
                 type="text"
-                placeholder="Nhập địa chỉ giao hàng..."
+                placeholder="Enter shipping address..."
                 value={shippingAddress}
                 onChange={(e) => setShippingAddress(e.target.value)}
                 style={checkoutStyles.addressInput}
@@ -301,10 +233,10 @@ const CheckoutPage = () => {
             {/* Note */}
             <div style={checkoutStyles.section}>
               <h2 style={checkoutStyles.sectionTitle}>
-                <span>📝</span> Ghi Chú
+                <span>📝</span> Note
               </h2>
               <textarea
-                placeholder="Lời nhắn cho người bán..."
+                placeholder="Message for the seller..."
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 style={checkoutStyles.noteTextarea}

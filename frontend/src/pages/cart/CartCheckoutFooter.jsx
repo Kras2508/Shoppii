@@ -1,14 +1,30 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const CartCheckoutFooter = ({ cartItems, selectedItems, onSelectAll, onCheckout, styles }) => {
+const CartCheckoutFooter = ({ cartItems, selectedItems, selectedCount, onSelectAll, onCheckout, styles }) => {
   const formatPrice = (price) => {
-    return price.toLocaleString('vi-VN') + 'đ';
+    return ((price || 0) * 1000).toLocaleString('vi-VN') + ' VND';
   };
 
-  const totalItems = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const totalSavings = selectedItems.reduce((sum, item) => sum + ((item.oldPrice - item.price) * item.quantity), 0);
+  // cartItems is shops array, selectedItems is array of item_ids
+  const selectedItemIds = new Set(selectedItems || []);
+  
+  // Calculate totals from all shops
+  let totalItems = 0;
+  let totalPrice = 0;
+  let allItemsCount = 0;
+  
+  cartItems?.forEach(shop => {
+    shop.items?.forEach(item => {
+      allItemsCount++;
+      if (selectedItemIds.has(item.item_id)) {
+        totalItems += item.quantity;
+        totalPrice += (item.price || 0) * item.quantity;
+      }
+    });
+  });
+
+  const allSelected = allItemsCount > 0 && selectedItemIds.size === allItemsCount;
 
   return (
     <div style={styles.checkoutFooter}>
@@ -18,10 +34,10 @@ const CartCheckoutFooter = ({ cartItems, selectedItems, onSelectAll, onCheckout,
             <input
               type="checkbox"
               style={styles.checkbox}
-              checked={cartItems.length > 0 && cartItems.every(item => item.selected)}
+              checked={allSelected}
               onChange={onSelectAll}
             />
-            Chọn Tất Cả ({cartItems.length})
+            Chọn Tất Cả ({allItemsCount})
           </label>
           <button
             style={styles.deleteSelected}
@@ -40,21 +56,16 @@ const CartCheckoutFooter = ({ cartItems, selectedItems, onSelectAll, onCheckout,
             <div style={styles.checkoutPrice}>
               {formatPrice(totalPrice)}
             </div>
-            {totalSavings > 0 && (
-              <div style={styles.checkoutSavings}>
-                Tiết kiệm: {formatPrice(totalSavings)}
-              </div>
-            )}
           </div>
           <button
             style={{
               ...styles.checkoutBtn,
-              opacity: selectedItems.length === 0 ? 0.6 : 1,
-              cursor: selectedItems.length === 0 ? 'not-allowed' : 'pointer'
+              opacity: selectedItemIds.size === 0 ? 0.6 : 1,
+              cursor: selectedItemIds.size === 0 ? 'not-allowed' : 'pointer'
             }}
             onClick={onCheckout}
             onMouseEnter={(e) => {
-              if (selectedItems.length > 0) {
+              if (selectedItemIds.size > 0) {
                 e.target.style.backgroundColor = '#556B5A';
               }
             }}

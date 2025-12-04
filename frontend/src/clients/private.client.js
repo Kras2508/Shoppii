@@ -3,17 +3,17 @@
     
     export default function createPrivateClient(dispatch) {
       const client = axios.create({
-        baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1',
+        baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
         timeout: 10000,
       })
     
       // Request interceptor: Add JWT token
       client.interceptors.request.use(
         (config) => {
-          const token = localStorage.getItem('tss_token')
+          const token = localStorage.getItem('token')
           if (token) {
             config.headers.Authorization = `Bearer ${token}`
-            console.log('🔑 Token attached to request:', config.url, '| Token:', token.substring(0, 20) + '...')
+            console.log('🔑 Token attached to request:', config.url)
           } else {
             console.warn('⚠️ No token found in localStorage for request:', config.url)
           }

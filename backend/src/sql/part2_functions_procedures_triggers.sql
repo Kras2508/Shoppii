@@ -14,6 +14,9 @@ DROP FUNCTION IF EXISTS fn_calculate_order_total;
 DROP FUNCTION IF EXISTS fn_get_customer_total_spent;
 DROP FUNCTION IF EXISTS fn_get_shop_revenue;
 DROP FUNCTION IF EXISTS fn_calculate_shop_rating;
+DROP PROCEDURE IF EXISTS sp_get_category_hierarchy;
+DROP PROCEDURE IF EXISTS sp_get_category_all_children;
+DROP PROCEDURE IF EXISTS sp_get_category_all_parents;
 
 DELIMITER $$
 
@@ -108,6 +111,147 @@ END$$
 DELIMITER ;
 
 -- =============================================
+-- RECURSION PROCEDURES FOR CATEGORY HIERARCHY
+-- =============================================
+
+DELIMITER $$
+
+-- ---------------------------------------------
+-- PROCEDURE: Get Category Hierarchy (All Parents & Children)
+-- Hiển thị toàn bộ hierarchy từ parent xuống child
+-- Dùng WITH RECURSIVE để lấy tất cả cấp độ
+-- Ví dụ: Electronics → Phones (Electronics là cha của Phones)
+-- ---------------------------------------------
+CREATE PROCEDURE sp_get_category_hierarchy()
+BEGIN
+    WITH RECURSIVE category_tree AS (
+        -- Anchor: Lấy tất cả danh mục root (parent_category_id IS NULL)
+        SELECT 
+            category_id,
+            category_name,
+            parent_category_id,
+            0 AS level,
+            CAST(category_name AS CHAR(500)) AS path
+        FROM Category
+        WHERE parent_category_id IS NULL
+        
+        UNION ALL
+        
+        -- Recursive: Lấy tất cả danh mục con
+        SELECT 
+            c.category_id,
+            c.category_name,
+            c.parent_category_id,
+            ct.level + 1,
+            CONCAT(ct.path, ' → ', c.category_name)
+        FROM Category c
+        INNER JOIN category_tree ct ON c.parent_category_id = ct.category_id
+        WHERE ct.level < 10  -- Tránh infinite loop, giới hạn 10 cấp độ
+    )
+    SELECT 
+        category_id,
+        category_name,
+        parent_category_id,
+        level,
+        path,
+        REPEAT('  ', level) AS indent
+    FROM category_tree
+    ORDER BY path;
+END$$
+
+-- ---------------------------------------------
+-- PROCEDURE: Get All Children of a Category (Recursion)
+-- Lấy tất cả danh mục con của 1 danh mục
+-- Ví dụ: Nhập Electronics → ra Phones, Laptops, ...
+-- Dùng recursion để lấy con, cháu, chắu, ...
+-- ---------------------------------------------
+CREATE PROCEDURE sp_get_category_all_children(IN p_category_id INT)
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM Category WHERE category_id = p_category_id) THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'Category does not exist';
+    END IF;
+    
+    WITH RECURSIVE children_tree AS (
+        -- Anchor: Lấy danh mục gốc
+        SELECT 
+            category_id,
+            category_name,
+            parent_category_id,
+            0 AS level
+        FROM Category
+        WHERE category_id = p_category_id
+        
+        UNION ALL
+        
+        -- Recursive: Lấy tất cả danh mục con cấp dưới
+        SELECT 
+            c.category_id,
+            c.category_name,
+            c.parent_category_id,
+            ct.level + 1
+        FROM Category c
+        INNER JOIN children_tree ct ON c.parent_category_id = ct.category_id
+        WHERE ct.level < 10
+    )
+    SELECT 
+        category_id,
+        category_name,
+        parent_category_id,
+        level,
+        REPEAT('  ', level) AS indent
+    FROM children_tree
+    ORDER BY level, category_name;
+END$$
+
+-- ---------------------------------------------
+-- PROCEDURE: Get All Parents of a Category (Reverse Recursion)
+-- Lấy tất cả danh mục cha của 1 danh mục
+-- Ví dụ: Nhập Phones → ra Electronics (cha) → NULL (root)
+-- Dùng recursion ngược để lấy cha, ông, tổ, ...
+-- ---------------------------------------------
+CREATE PROCEDURE sp_get_category_all_parents(IN p_category_id INT)
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM Category WHERE category_id = p_category_id) THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'Category does not exist';
+    END IF;
+    
+    WITH RECURSIVE parents_tree AS (
+        -- Anchor: Lấy danh mục gốc
+        SELECT 
+            category_id,
+            category_name,
+            parent_category_id,
+            0 AS level
+        FROM Category
+        WHERE category_id = p_category_id
+        
+        UNION ALL
+        
+        -- Recursive: Lấy tất cả danh mục cha cấp trên
+        SELECT 
+            c.category_id,
+            c.category_name,
+            c.parent_category_id,
+            pt.level + 1
+        FROM Category c
+        INNER JOIN parents_tree pt ON pt.parent_category_id = c.category_id
+        WHERE pt.level < 10
+    )
+    SELECT 
+        category_id,
+        category_name,
+        parent_category_id,
+        level,
+        REPEAT('  ', level) AS indent
+    FROM parents_tree
+    ORDER BY level DESC, category_name;
+END$$
+
+DELIMITER ;
+
+-- =============================================
 -- STORED PROCEDURES
 -- =============================================
 
@@ -164,7 +308,7 @@ BEGIN
         SUM(oi.quantity * oi.price_at_purchase) AS item_revenue
     FROM Product p
     INNER JOIN ProductItem pi ON p.product_id = pi.product_id
-    INNER JOIN OrderItem oi ON pi.item_id = oi.variantID
+    INNER JOIN OrderItem oi ON pi.item_id = oi.item_id
     INNER JOIN `Order` o ON oi.order_id = o.order_id
     WHERE pi.shop_id = p_shop_id
       AND o.order_date BETWEEN p_from_date AND DATE_ADD(p_to_date, INTERVAL 1 DAY)
@@ -303,7 +447,7 @@ BEGIN
     SET p_order_id = LAST_INSERT_ID();
     
     -- Move cart items to order items
-    INSERT INTO OrderItem (order_id, variantID, shop_id, quantity, price_at_purchase)
+    INSERT INTO OrderItem (order_id, item_id, shop_id, quantity, price_at_purchase)
     SELECT 
         p_order_id,
         ci.item_id,
@@ -355,7 +499,7 @@ BEGIN
     INNER JOIN Category c ON p.category_id = c.category_id
     INNER JOIN Shop s ON p.shop_id = s.shop_id
     LEFT JOIN ProductItem pi ON p.product_id = pi.product_id
-    LEFT JOIN OrderItem oi ON pi.item_id = oi.variantID
+    LEFT JOIN OrderItem oi ON pi.item_id = oi.item_id
     LEFT JOIN `Order` o ON oi.order_id = o.order_id 
         AND o.status != 'Cancelled'
     LEFT JOIN Review r ON p.product_id = r.target_id 
@@ -475,7 +619,7 @@ BEGIN
     SELECT price, stock, shop_id
     INTO v_item_price, v_item_stock, v_shop_id
     FROM ProductItem
-    WHERE item_id = NEW.variantID;
+    WHERE item_id = NEW.item_id;
     
     -- Validate item exists
     IF v_item_price IS NULL THEN
@@ -515,12 +659,12 @@ BEGIN
     -- Decrease product item stock
     UPDATE ProductItem
     SET stock = stock - NEW.quantity
-    WHERE item_id = NEW.variantID;
+    WHERE item_id = NEW.item_id;
     
     -- Get product_id and check total stock
     SELECT product_id INTO v_product_id
     FROM ProductItem
-    WHERE item_id = NEW.variantID;
+    WHERE item_id = NEW.item_id;
     
     SELECT SUM(stock) INTO v_total_stock
     FROM ProductItem
@@ -556,7 +700,7 @@ BEGIN
             SELECT 1
             FROM OrderItem oi
             INNER JOIN `Order` o ON oi.order_id = o.order_id
-            INNER JOIN ProductItem pi ON oi.variantID = pi.item_id
+            INNER JOIN ProductItem pi ON oi.item_id = pi.item_id
             WHERE pi.product_id = NEW.target_id
               AND o.customer_id = NEW.customer_id
               AND o.status = 'Delivered'
@@ -635,21 +779,21 @@ FOR EACH ROW
 BEGIN
     -- If customer, create customer record and cart
     IF NEW.role = 'Customer' THEN
-        INSERT INTO Customer (customer_id, account_id, address, add_phone, total_spent, total_order)
-        VALUES (NEW.account_id, NEW.account_id, NULL, NULL, 0, 0);
+        INSERT INTO Customer (customer_id, address, add_phone, total_spent, total_order)
+        VALUES (NEW.account_id, NULL, NULL, 0, 0);
         
         INSERT INTO Cart (customer_id)
         VALUES (NEW.account_id);
     
     -- If shop, create shop record
     ELSEIF NEW.role = 'Shop' THEN
-        INSERT INTO Shop (shop_id, account_id, shop_name, shop_phone, address_shop, rating, shop_status)
-        VALUES (NEW.account_id, NEW.account_id, CONCAT('Shop ', NEW.account_id), NULL, NULL, 0, 'Open');
+        INSERT INTO Shop (shop_id, shop_name, shop_phone, address_shop, rating)
+        VALUES (NEW.account_id, CONCAT('Shop ', NEW.account_id), NULL, NULL, 0);
     
     -- If admin, create admin record
     ELSEIF NEW.role = 'Admin' THEN
-        INSERT INTO Admin (admin_id, account_id, role, note)
-        VALUES (NEW.account_id, NEW.account_id, 'Support', NULL);
+        INSERT INTO Admin (admin_id, role, note)
+        VALUES (NEW.account_id, 'Support', NULL);
     END IF;
 END$$
 
@@ -674,7 +818,7 @@ SELECT
     fn_get_customer_total_spent(c.customer_id) AS calculated_spent,
     c.total_spent
 FROM Customer c
-INNER JOIN Account a ON c.account_id = a.account_id
+INNER JOIN Account a ON c.customer_id = a.account_id
 LIMIT 5;
 
 -- Test Function 3: Get Shop Revenue
@@ -694,7 +838,7 @@ SELECT
 FROM Shop s;
 
 -- Test Procedure 1: Get Shop Revenue Report
-CALL sp_get_shop_revenue_report(1, '2025-01-01', '2025-12-31');
+CALL sp_get_shop_revenue_report(4, '2025-01-01', '2025-12-31');
 
 -- Test Procedure 3: Get Product Statistics
 CALL sp_get_product_statistics(NULL, NULL, NULL, NULL);
@@ -702,6 +846,24 @@ CALL sp_get_product_statistics(NULL, NULL, NULL, NULL);
 -- Test Procedure 4: Apply Voucher
 CALL sp_apply_voucher(1, 600000, @discount, @valid, @message);
 SELECT @discount AS discount_amount, @valid AS is_valid, @message AS message;
+
+-- =============================================
+-- TEST QUERIES FOR CATEGORY RECURSION
+-- =============================================
+
+-- Test Recursion 1: Get Full Category Hierarchy
+-- Hiển thị toàn bộ cây danh mục từ root xuống leaf
+CALL sp_get_category_hierarchy();
+
+-- Test Recursion 2: Get All Children of Electronics
+-- Nhập category_id = 1 (Electronics)
+-- Output: Phones (level 1), Laptops (level 1), và tất cả con cháu
+CALL sp_get_category_all_children(1);
+
+-- Test Recursion 3: Get All Parents of Phones
+-- Nhập category_id = 3 (Phones)
+-- Output: Electronics (cha), NULL (root)
+CALL sp_get_category_all_parents(3);
 
 -- =============================================
 -- End of Functions, Procedures, and Triggers Script

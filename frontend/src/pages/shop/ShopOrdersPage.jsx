@@ -1,116 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import shopStyles from './shopStyles';
+import { orderService } from '../../api/orderService';
+import createPrivateClient from '../../clients/private.client';
 
 const ShopOrdersPage = () => {
   const [searchParams] = useSearchParams();
   const initialStatus = searchParams.get('status') || 'all';
+  const { token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
   
   const [filterStatus, setFilterStatus] = useState(initialStatus);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [showOrderDetail, setShowOrderDetail] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock orders data
-  const orders = [
-    {
-      order_id: 1001,
-      customer_name: 'Nguyễn Văn A',
-      customer_phone: '0901234567',
-      customer_address: '123 Đường Nguyễn Huệ, Quận 1, TP.HCM',
-      items: [
-        { product_id: 1, name: 'Áo thun nam cotton cao cấp', variant: 'Trắng - L', quantity: 2, price: 129000, image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=80&h=80&fit=crop' }
-      ],
-      total: 258000,
-      shipping_fee: 30000,
-      status: 'Processing',
-      payment_method: 'COD',
-      created_at: '2024-12-03 10:30',
-      note: 'Giao giờ hành chính'
-    },
-    {
-      order_id: 1002,
-      customer_name: 'Trần Thị B',
-      customer_phone: '0912345678',
-      customer_address: '456 Đường Lê Lợi, Quận 3, TP.HCM',
-      items: [
-        { product_id: 2, name: 'Quần jean nam slim fit', variant: 'Xanh đậm - 32', quantity: 1, price: 259000, image: 'https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?w=80&h=80&fit=crop' },
-        { product_id: 3, name: 'Giày thể thao sneaker', variant: 'Trắng - 42', quantity: 1, price: 450000, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=80&h=80&fit=crop' }
-      ],
-      total: 709000,
-      shipping_fee: 0,
-      status: 'Shipped',
-      payment_method: 'Banking',
-      created_at: '2024-12-02 15:45',
-      note: ''
-    },
-    {
-      order_id: 1003,
-      customer_name: 'Lê Văn C',
-      customer_phone: '0923456789',
-      customer_address: '789 Đường Hai Bà Trưng, Quận 1, TP.HCM',
-      items: [
-        { product_id: 4, name: 'Váy midi hoa nhí', variant: 'Hồng - M', quantity: 1, price: 159000, image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=80&h=80&fit=crop' }
-      ],
-      total: 159000,
-      shipping_fee: 25000,
-      status: 'Pending',
-      payment_method: 'COD',
-      created_at: '2024-12-03 08:15',
-      note: 'Gọi trước khi giao'
-    },
-    {
-      order_id: 1004,
-      customer_name: 'Phạm Thị D',
-      customer_phone: '0934567890',
-      customer_address: '321 Đường Võ Văn Tần, Quận 3, TP.HCM',
-      items: [
-        { product_id: 1, name: 'Áo thun nam cotton cao cấp', variant: 'Đen - XL', quantity: 3, price: 129000, image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=80&h=80&fit=crop' },
-        { product_id: 5, name: 'Áo sơ mi công sở', variant: 'Xanh nhạt - L', quantity: 2, price: 199000, image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=80&h=80&fit=crop' }
-      ],
-      total: 785000,
-      shipping_fee: 0,
-      status: 'Delivered',
-      payment_method: 'Banking',
-      created_at: '2024-11-30 14:20',
-      note: ''
-    },
-    {
-      order_id: 1005,
-      customer_name: 'Hoàng Văn E',
-      customer_phone: '0945678901',
-      customer_address: '654 Đường Cách Mạng Tháng 8, Quận 10, TP.HCM',
-      items: [
-        { product_id: 3, name: 'Giày thể thao sneaker', variant: 'Đen - 41', quantity: 1, price: 450000, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=80&h=80&fit=crop' }
-      ],
-      total: 450000,
-      shipping_fee: 30000,
-      status: 'Cancelled',
-      payment_method: 'COD',
-      created_at: '2024-11-29 09:00',
-      note: 'Khách hủy - không liên lạc được'
-    },
-    {
-      order_id: 1006,
-      customer_name: 'Ngô Thị F',
-      customer_phone: '0956789012',
-      customer_address: '987 Đường Điện Biên Phủ, Quận Bình Thạnh, TP.HCM',
-      items: [
-        { product_id: 2, name: 'Quần jean nam slim fit', variant: 'Đen - 30', quantity: 2, price: 259000, image: 'https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?w=80&h=80&fit=crop' }
-      ],
-      total: 518000,
-      shipping_fee: 0,
-      status: 'Pending',
-      payment_method: 'Banking',
-      created_at: '2024-12-03 11:00',
-      note: ''
-    }
-  ];
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        const params = {};
+        if (filterStatus !== 'all') {
+          params.status = filterStatus;
+        }
+        const response = await orderService.getOrders(privateClient, params);
+        if (response.data?.data?.orders) {
+          setOrders(response.data.data.orders.map(order => ({
+            order_id: order.order_id,
+            customer_name: order.customer_name || 'Khách hàng',
+            customer_phone: order.customer_phone || '',
+            customer_address: order.shipping_address,
+            items: order.items || [],
+            total: order.total_amount,
+            shipping_fee: order.shipping_fee || 0,
+            status: order.status,
+            payment_method: order.payment_method,
+            created_at: new Date(order.created_at).toLocaleString('vi-VN'),
+            note: order.note || ''
+          })));
+        }
+      } catch (err) {
+        console.error('Error fetching orders:', err);
+        setError('Không thể tải danh sách đơn hàng');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrders();
+  }, [filterStatus, token]);
 
   // Stats
   const stats = {
     all: orders.length,
-    pending: orders.filter(o => o.status === 'Pending').length,
+    pending: orders.filter(o => o.status === 'Pending' || o.status === 'Processing').length,
     processing: orders.filter(o => o.status === 'Processing').length,
     shipped: orders.filter(o => o.status === 'Shipped').length,
     delivered: orders.filter(o => o.status === 'Delivered').length,
