@@ -283,7 +283,7 @@ const SignUpPage = () => {
             </div>
 
             <div style={styles.formGroup}>
-              <label style={styles.label}>Xác nhận mật khẩu</label>
+              <label style={styles.label}>Confirm Password</label>
               <input
                 type="password"
                 name="confirmPassword"

@@ -30,7 +30,7 @@ const ProductGrid = ({ products }) => {
     return (
       <div style={styles.noResults}>
         <div style={styles.noResultsIcon}>🔍</div>
-        <p style={styles.noResultsText}>Không tìm thấy sản phẩm phù hợp</p>
+        <p style={styles.noResultsText}>Cannot find matching products</p>
       </div>
     );
   }

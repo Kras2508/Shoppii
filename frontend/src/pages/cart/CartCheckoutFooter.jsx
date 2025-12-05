@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 const CartCheckoutFooter = ({ cartItems, selectedItems, selectedCount, onSelectAll, onCheckout, styles }) => {
   const formatPrice = (price) => {
-    return ((price || 0) * 1000).toLocaleString('vi-VN') + ' VND';
+    return ((price || 0)).toLocaleString('vi-VN') + ' VND';
   };
 
   // cartItems is shops array, selectedItems is array of item_ids
@@ -37,21 +37,21 @@ const CartCheckoutFooter = ({ cartItems, selectedItems, selectedCount, onSelectA
               checked={allSelected}
               onChange={onSelectAll}
             />
-            Chọn Tất Cả ({allItemsCount})
+            Select all ({allItemsCount})
           </label>
           <button
             style={styles.deleteSelected}
             onMouseEnter={(e) => e.target.style.color = '#d9534f'}
             onMouseLeave={(e) => e.target.style.color = '#999'}
           >
-            Xóa
+            Delete
           </button>
         </div>
 
         <div style={styles.checkoutRight}>
           <div style={styles.checkoutInfo}>
             <div style={styles.checkoutTotal}>
-              Tổng thanh toán ({totalItems} sản phẩm):
+              Total payment ({totalItems} products):
             </div>
             <div style={styles.checkoutPrice}>
               {formatPrice(totalPrice)}
@@ -71,7 +71,7 @@ const CartCheckoutFooter = ({ cartItems, selectedItems, selectedCount, onSelectA
             }}
             onMouseLeave={(e) => e.target.style.backgroundColor = '#647A67'}
           >
-            Mua Hàng
+            Buy
           </button>
         </div>
       </div>

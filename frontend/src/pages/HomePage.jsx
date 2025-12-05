@@ -460,7 +460,7 @@ const HomePage = () => {
                     <div style={styles.productInfo}>
                       <p style={styles.productName}>{product.product_name}</p>
                       <div style={styles.productPriceRow}>
-                        <span style={styles.productPrice}>{(Number(product.min_price) * 1000).toLocaleString('vi-VN')} VND</span>
+                        <span style={styles.productPrice}>{(Number(product.min_price)).toLocaleString('vi-VN')} VND</span>
                       </div>
                       <div style={styles.productFooter}>
                         <div style={styles.productRating}>

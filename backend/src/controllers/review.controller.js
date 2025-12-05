@@ -27,7 +27,7 @@ export const getReviews = async (req, res) => {
         a.email as customer_email
       FROM Review r
       INNER JOIN Customer c ON r.customer_id = c.customer_id
-      INNER JOIN Account a ON c.account_id = a.account_id
+      INNER JOIN Account a ON c.customer_id = a.account_id
       WHERE r.target_type = ? AND r.target_id = ?
       ORDER BY r.review_date DESC
       LIMIT ? OFFSET ?
@@ -106,10 +106,13 @@ export const createReview = async (req, res) => {
       });
     }
 
-    // Get customer_id
+    // customer_id = account_id (1-1 relationship)
+    const customerId = accountId;
+
+    // Verify customer exists
     const [customers] = await pool.query(
-      'SELECT customer_id FROM Customer WHERE account_id = ?',
-      [accountId]
+      'SELECT customer_id FROM Customer WHERE customer_id = ?',
+      [customerId]
     );
 
     if (customers.length === 0) {
@@ -118,8 +121,6 @@ export const createReview = async (req, res) => {
         message: 'Customer not found'
       });
     }
-
-    const customerId = customers[0].customer_id;
 
     // Check if already reviewed
     const [existingReviews] = await pool.query(`
@@ -172,13 +173,8 @@ export const updateReview = async (req, res) => {
     const { id } = req.params;
     const { rating, comment, image_url } = req.body;
 
-    // Get customer_id
-    const [customers] = await pool.query(
-      'SELECT customer_id FROM Customer WHERE account_id = ?',
-      [accountId]
-    );
-
-    const customerId = customers[0].customer_id;
+    // customer_id = account_id (1-1 relationship)
+    const customerId = accountId;
 
     // Check if review exists and belongs to customer
     const [reviews] = await pool.query(
@@ -271,13 +267,9 @@ export const deleteReview = async (req, res) => {
     const params = [id];
 
     if (role === 'Customer') {
-      // Get customer_id
-      const [customers] = await pool.query(
-        'SELECT customer_id FROM Customer WHERE account_id = ?',
-        [accountId]
-      );
+      // customer_id = account_id (1-1 relationship)
       deleteQuery += ' AND customer_id = ?';
-      params.push(customers[0].customer_id);
+      params.push(accountId);
     }
 
     // Get review info for updating shop rating
@@ -330,13 +322,8 @@ export const getMyReviews = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
-    // Get customer_id
-    const [customers] = await pool.query(
-      'SELECT customer_id FROM Customer WHERE account_id = ?',
-      [accountId]
-    );
-
-    const customerId = customers[0].customer_id;
+    // customer_id = account_id (same key, 1-1 relationship)
+    const customerId = accountId;
 
     const [reviews] = await pool.query(`
       SELECT 
@@ -388,10 +375,13 @@ export const getShopReviews = async (req, res) => {
     const { page = 1, limit = 10, rating } = req.query;
     const offset = (page - 1) * limit;
 
-    // Get shop_id
+    // shop_id = account_id (1-1 relationship)
+    const shopId = accountId;
+
+    // Verify shop exists
     const [shops] = await pool.query(
-      'SELECT shop_id FROM Shop WHERE account_id = ?',
-      [accountId]
+      'SELECT shop_id FROM Shop WHERE shop_id = ?',
+      [shopId]
     );
 
     if (shops.length === 0) {
@@ -400,8 +390,6 @@ export const getShopReviews = async (req, res) => {
         message: 'Shop not found'
       });
     }
-
-    const shopId = shops[0].shop_id;
 
     let whereClause = `WHERE (
       (r.target_type = 'Shop' AND r.target_id = ?) OR
@@ -416,16 +404,30 @@ export const getShopReviews = async (req, res) => {
 
     const [reviews] = await pool.query(`
       SELECT 
-        r.*,
+        r.review_id,
+        r.customer_id,
+        r.target_type,
+        r.target_id,
+        r.rating,
+        r.comment,
+        r.image_url,
+        r.review_date,
         a.full_name as customer_name,
         CASE 
           WHEN r.target_type = 'Product' THEN p.product_name
           WHEN r.target_type = 'Shop' THEN 'Shop Review'
-        END as target_name
+        END as product_name,
+        CASE
+          WHEN r.target_type = 'Product' THEN COALESCE(pi.image_url, p.image)
+          WHEN r.target_type = 'Shop' THEN NULL
+        END as product_image
       FROM Review r
       INNER JOIN Customer c ON r.customer_id = c.customer_id
-      INNER JOIN Account a ON c.account_id = a.account_id
+      INNER JOIN Account a ON c.customer_id = a.account_id
       LEFT JOIN Product p ON r.target_type = 'Product' AND r.target_id = p.product_id
+      LEFT JOIN ProductItem pi ON r.target_type = 'Product' AND p.product_id = pi.product_id AND pi.item_id = (
+        SELECT MIN(item_id) FROM ProductItem WHERE product_id = p.product_id
+      )
       ${whereClause}
       ORDER BY r.review_date DESC
       LIMIT ? OFFSET ?
@@ -478,3 +480,4 @@ export const getShopReviews = async (req, res) => {
     });
   }
 };
+

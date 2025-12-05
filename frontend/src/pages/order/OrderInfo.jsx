@@ -3,14 +3,14 @@ import React from 'react';
 const OrderInfo = ({ order, styles, formatPrice }) => {
   return (
     <div style={styles.infoSection}>
-      <h3 style={styles.infoTitle}>Thông Tin Đơn Hàng</h3>
+      <h3 style={styles.infoTitle}>Order details</h3>
       
       <div style={styles.infoGrid}>
         {/* Shipping Info */}
         <div style={styles.infoCard}>
           <div style={styles.infoCardIcon}>📍</div>
           <div style={styles.infoCardContent}>
-            <div style={styles.infoCardLabel}>Địa chỉ giao hàng</div>
+            <div style={styles.infoCardLabel}>Shipping address</div>
             <div style={styles.infoCardValue}>{order.shipping_address}</div>
           </div>
         </div>
@@ -19,10 +19,10 @@ const OrderInfo = ({ order, styles, formatPrice }) => {
         <div style={styles.infoCard}>
           <div style={styles.infoCardIcon}>🚚</div>
           <div style={styles.infoCardContent}>
-            <div style={styles.infoCardLabel}>Phương thức vận chuyển</div>
+            <div style={styles.infoCardLabel}>Shipping method</div>
             <div style={styles.infoCardValue}>{order.shipping?.name}</div>
             <div style={styles.infoCardSub}>
-              Dự kiến: {order.shipping?.estimated_days} ngày
+              Estimated: {order.shipping?.estimated_days} days
             </div>
           </div>
         </div>
@@ -31,7 +31,7 @@ const OrderInfo = ({ order, styles, formatPrice }) => {
         <div style={styles.infoCard}>
           <div style={styles.infoCardIcon}>💳</div>
           <div style={styles.infoCardContent}>
-            <div style={styles.infoCardLabel}>Phương thức thanh toán</div>
+            <div style={styles.infoCardLabel}>Payment method</div>
             <div style={styles.infoCardValue}>{order.payment_method}</div>
           </div>
         </div>
@@ -40,9 +40,9 @@ const OrderInfo = ({ order, styles, formatPrice }) => {
         <div style={styles.infoCard}>
           <div style={styles.infoCardIcon}>📅</div>
           <div style={styles.infoCardContent}>
-            <div style={styles.infoCardLabel}>Ngày đặt hàng</div>
+            <div style={styles.infoCardLabel}>Order date</div>
             <div style={styles.infoCardValue}>
-              {new Date(order.order_date).toLocaleDateString('vi-VN', {
+              {new Date(order.order_date).toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',

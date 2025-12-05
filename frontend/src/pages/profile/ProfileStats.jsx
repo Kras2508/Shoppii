@@ -5,23 +5,23 @@ const ProfileStats = ({ stats, styles, formatPrice }) => {
     {
       icon: '🛒',
       value: stats.total_order,
-      label: 'Đơn hàng'
+      label: 'Total Orders'
     },
     {
       icon: '💰',
       value: formatPrice(stats.total_spent),
-      label: 'Tổng chi tiêu',
+      label: 'Total Spent',
       isPrice: true
     },
     {
       icon: '📦',
       value: stats.delivered_orders,
-      label: 'Đã giao'
+      label: 'Delivered'
     },
     {
       icon: '⭐',
       value: stats.total_reviews,
-      label: 'Đánh giá'
+      label: 'Reviews'
     }
   ];
 

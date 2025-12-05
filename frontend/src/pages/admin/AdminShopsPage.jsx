@@ -1,111 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import adminStyles from './adminStyles.js';
+import { adminService } from '../../api/adminService.js';
 import Modal from '../../components/common/Modal';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
+import createPrivateClient from '../../clients/private.client';
 
 const AdminShopsPage = () => {
+  const { token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedShop, setSelectedShop] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [activeTab, setActiveTab] = useState('all'); // all, pending, approved
+  const [activeTab, setActiveTab] = useState('all');
+  const [shops, setShops] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data
-  const [shops, setShops] = useState([
-    { 
-      id: 1, shop_id: 'SHOP001', shop_name: 'Fashion House', email: 'shop.fashion@gmail.com',
-      status: 'Open', approval_status: 'Approved', rating: 4.8, total_products: 156, 
-      total_orders: 1245, total_revenue: 450000000, created_at: '2024-01-10',
-      phone: '0901234567', address: '123 Nguyễn Huệ, Q.1, TP.HCM',
-      logo: 'https://via.placeholder.com/80', description: 'Shop thời trang nam nữ cao cấp'
-    },
-    { 
-      id: 2, shop_id: 'SHOP002', shop_name: 'Tech World', email: 'shop.tech@gmail.com',
-      status: 'Open', approval_status: 'Approved', rating: 4.9, total_products: 89, 
-      total_orders: 980, total_revenue: 890000000, created_at: '2024-01-22',
-      phone: '0909876543', address: '456 Lê Lợi, Q.1, TP.HCM',
-      logo: 'https://via.placeholder.com/80', description: 'Đồ công nghệ chính hãng'
-    },
-    { 
-      id: 3, shop_id: 'SHOP003', shop_name: 'Beauty Corner', email: 'shop.beauty@gmail.com',
-      status: 'Open', approval_status: 'Approved', rating: 4.6, total_products: 234, 
-      total_orders: 654, total_revenue: 180000000, created_at: '2024-02-15',
-      phone: '0912345678', address: '789 Trần Hưng Đạo, Q.5, TP.HCM',
-      logo: 'https://via.placeholder.com/80', description: 'Mỹ phẩm và skincare'
-    },
-    { 
-      id: 4, shop_id: 'SHOP004', shop_name: 'Home & Living', email: 'shop.home@gmail.com',
-      status: 'Temporarily Close', approval_status: 'Approved', rating: 4.7, total_products: 178, 
-      total_orders: 756, total_revenue: 320000000, created_at: '2024-01-28',
-      phone: '0923456789', address: '321 Võ Văn Tần, Q.3, TP.HCM',
-      logo: 'https://via.placeholder.com/80', description: 'Nội thất và đồ gia dụng'
-    },
-    { 
-      id: 5, shop_id: 'SHOP005', shop_name: 'New Fashion', email: 'newfashion@gmail.com',
-      status: 'Closed', approval_status: 'Pending', rating: 0, total_products: 0, 
-      total_orders: 0, total_revenue: 0, created_at: '2024-04-20',
-      phone: '0934567890', address: '654 Hai Bà Trưng, Q.1, TP.HCM',
-      logo: 'https://via.placeholder.com/80', description: 'Thời trang trẻ trung'
-    },
-    { 
-      id: 6, shop_id: 'SHOP006', shop_name: 'Gadget Zone', email: 'gadget@gmail.com',
-      status: 'Closed', approval_status: 'Pending', rating: 0, total_products: 0, 
-      total_orders: 0, total_revenue: 0, created_at: '2024-04-22',
-      phone: '0945678901', address: '987 Nguyễn Thị Minh Khai, Q.3, TP.HCM',
-      logo: 'https://via.placeholder.com/80', description: 'Phụ kiện điện thoại'
-    },
-    { 
-      id: 7, shop_id: 'SHOP007', shop_name: 'Sports Zone', email: 'sports@gmail.com',
-      status: 'Open', approval_status: 'Approved', rating: 4.5, total_products: 120, 
-      total_orders: 543, total_revenue: 250000000, created_at: '2024-02-05',
-      phone: '0956789012', address: '147 Đinh Tiên Hoàng, Q.Bình Thạnh, TP.HCM',
-      logo: 'https://via.placeholder.com/80', description: 'Đồ thể thao chính hãng'
-    },
-    { 
-      id: 8, shop_id: 'SHOP008', shop_name: 'Book World', email: 'bookworld@gmail.com',
-      status: 'Closed', approval_status: 'Rejected', rating: 0, total_products: 0, 
-      total_orders: 0, total_revenue: 0, created_at: '2024-03-15',
-      phone: '0967890123', address: '258 Cách Mạng Tháng 8, Q.10, TP.HCM',
-      logo: 'https://via.placeholder.com/80', description: 'Sách và văn phòng phẩm'
+  useEffect(() => {
+    const fetchShops = async () => {
+      try {
+        setLoading(true);
+        const response = await adminService.getAllShops(privateClient, {
+          search: searchTerm || undefined
+        });
+        if (response.data?.data?.shops) {
+          setShops(response.data.data.shops);
+        }
+      } catch (err) {
+        console.error('Error fetching shops:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchShops();
     }
-  ]);
+  }, [token, searchTerm]);
 
   const tabs = [
     { id: 'all', label: 'Tất cả', count: shops.length },
-    { id: 'pending', label: 'Chờ duyệt', count: shops.filter(s => s.approval_status === 'Pending').length },
-    { id: 'approved', label: 'Đã duyệt', count: shops.filter(s => s.approval_status === 'Approved').length },
-    { id: 'rejected', label: 'Từ chối', count: shops.filter(s => s.approval_status === 'Rejected').length }
+    { id: 'active', label: 'Hoạt động', count: shops.filter(s => s.account_status === 'Active').length },
+    { id: 'ban', label: 'Bị ban', count: shops.filter(s => s.account_status === 'Ban').length }
   ];
 
   const filteredShops = shops.filter(shop => {
     const matchSearch = 
       shop.shop_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       shop.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shop.shop_id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchStatus = statusFilter === 'all' || shop.status === statusFilter;
-    const matchTab = activeTab === 'all' || shop.approval_status.toLowerCase() === activeTab;
+      shop.shop_id.toString().toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus = statusFilter === 'all' || shop.shop_status === statusFilter;
+    const matchTab = activeTab === 'all' || shop.account_status.toLowerCase() === activeTab;
     return matchSearch && matchStatus && matchTab;
   });
 
   const handleApprove = (shopId) => {
     setShops(prev => prev.map(shop => 
-      shop.id === shopId ? { ...shop, approval_status: 'Approved', status: 'Open' } : shop
+      shop.shop_id === shopId ? { ...shop, account_status: 'Active' } : shop
     ));
   };
 
   const handleReject = (shopId) => {
     setShops(prev => prev.map(shop => 
-      shop.id === shopId ? { ...shop, approval_status: 'Rejected' } : shop
+      shop.shop_id === shopId ? { ...shop, account_status: 'Ban' } : shop
     ));
   };
 
   const handleToggleStatus = (shopId) => {
     setShops(prev => prev.map(shop => {
-      if (shop.id === shopId) {
-        const newStatus = shop.status === 'Open' ? 'Temporarily Close' : 'Open';
-        return { ...shop, status: newStatus };
+      if (shop.shop_id === shopId) {
+        const newStatus = shop.shop_status === 'Open' ? 'Temporarily Close' : 'Open';
+        return { ...shop, shop_status: newStatus };
       }
       return shop;
     }));
@@ -267,10 +236,17 @@ const AdminShopsPage = () => {
 
   const getApprovalBadgeVariant = (status) => {
     switch (status) {
-      case 'Approved': return 'success';
-      case 'Pending': return 'warning';
-      case 'Rejected': return 'danger';
+      case 'Active': return 'success';
+      case 'Ban': return 'danger';
       default: return 'secondary';
+    }
+  };
+
+  const getApprovalText = (status) => {
+    switch (status) {
+      case 'Active': return '✓ Hoạt động';
+      case 'Ban': return '✕ Bị ban';
+      default: return status;
     }
   };
 
@@ -366,21 +342,21 @@ const AdminShopsPage = () => {
         {/* Shop List */}
         {filteredShops.map(shop => {
           return (
-            <div key={shop.id} style={styles.shopCard}>
+            <div key={shop.shop_id} style={styles.shopCard}>
               <div style={styles.shopLogo}>🏪</div>
               <div style={styles.shopInfo}>
                 <div style={styles.shopName}>
                   {shop.shop_name}
-                  <Badge variant={getApprovalBadgeVariant(shop.approval_status)} size="small">
-                    {shop.approval_status}
+                  <Badge variant={getApprovalBadgeVariant(shop.account_status)} size="small">
+                    {getApprovalText(shop.account_status)}
                   </Badge>
                 </div>
                 <div style={{ fontSize: '13px', color: '#666' }}>{shop.email}</div>
                 <div style={styles.shopMeta}>
-                  <Badge variant={getStatusBadgeVariant(shop.status)} size="small">
-                    {getStatusText(shop.status)}
+                  <Badge variant={getStatusBadgeVariant(shop.shop_status)} size="small">
+                    {getStatusText(shop.shop_status)}
                   </Badge>
-                  <span>📍 {shop.address.split(',')[1]?.trim()}</span>
+                  {shop.address_shop && <span>📍 {shop.address_shop.split(',')[1]?.trim() || shop.address_shop}</span>}
                   {shop.rating > 0 && <span>⭐ {shop.rating}</span>}
                 </div>
               </div>
@@ -409,36 +385,38 @@ const AdminShopsPage = () => {
                 >
                   Chi tiết
                 </Button>
-                {shop.approval_status === 'Pending' && (
+                {shop.account_status === 'Active' && (
+                  <>
+                    <Button
+                      variant="danger"
+                      size="small"
+                      icon="✕"
+                      onClick={() => handleReject(shop.shop_id)}
+                    >
+                      Ban
+                    </Button>
+                  </>
+                )}
+                {shop.account_status === 'Ban' && (
                   <>
                     <Button
                       variant="success"
                       size="small"
                       icon="✓"
-                      onClick={() => handleApprove(shop.id)}
+                      onClick={() => handleApprove(shop.shop_id)}
                     >
-                      Duyệt
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="small"
-                      icon="✕"
-                      onClick={() => handleReject(shop.id)}
-                    >
-                      Từ chối
+                      Bỏ ban
                     </Button>
                   </>
                 )}
-                {shop.approval_status === 'Approved' && (
-                  <Button
-                    variant={shop.status === 'Open' ? 'warning' : 'success'}
-                    size="small"
-                    icon={shop.status === 'Open' ? '⏸️' : '▶️'}
-                    onClick={() => handleToggleStatus(shop.id)}
-                  >
-                    {shop.status === 'Open' ? 'Tạm đóng' : 'Mở lại'}
-                  </Button>
-                )}
+                <Button
+                  variant={shop.shop_status === 'Open' ? 'warning' : 'success'}
+                  size="small"
+                  icon={shop.shop_status === 'Open' ? '⏸️' : '▶️'}
+                  onClick={() => handleToggleStatus(shop.shop_id)}
+                >
+                  {shop.shop_status === 'Open' ? 'Tạm đóng' : 'Mở lại'}
+                </Button>
               </div>
             </div>
           );
@@ -463,21 +441,25 @@ const AdminShopsPage = () => {
               <Button variant="outline" onClick={() => setShowModal(false)}>
                 Đóng
               </Button>
-              {selectedShop.approval_status === 'Pending' && (
+              {selectedShop.account_status === 'Active' && (
+                <>
+                  <Button
+                    variant="danger"
+                    icon="✕"
+                    onClick={() => { handleReject(selectedShop.shop_id); setShowModal(false); }}
+                  >
+                    Ban
+                  </Button>
+                </>
+              )}
+              {selectedShop.account_status === 'Ban' && (
                 <>
                   <Button
                     variant="success"
                     icon="✓"
-                    onClick={() => { handleApprove(selectedShop.id); setShowModal(false); }}
+                    onClick={() => { handleApprove(selectedShop.shop_id); setShowModal(false); }}
                   >
-                    Duyệt Shop
-                  </Button>
-                  <Button
-                    variant="danger"
-                    icon="✕"
-                    onClick={() => { handleReject(selectedShop.id); setShowModal(false); }}
-                  >
-                    Từ chối
+                    Bỏ ban
                   </Button>
                 </>
               )}
@@ -492,11 +474,11 @@ const AdminShopsPage = () => {
                 <h2 style={{ margin: '0 0 4px 0', fontSize: '22px' }}>{selectedShop.shop_name}</h2>
                 <div style={{ color: '#666', fontSize: '14px' }}>{selectedShop.email}</div>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                  <Badge variant={getApprovalBadgeVariant(selectedShop.approval_status)}>
-                    {selectedShop.approval_status}
+                  <Badge variant={getApprovalBadgeVariant(selectedShop.account_status)}>
+                    {getApprovalText(selectedShop.account_status)}
                   </Badge>
-                  <Badge variant={getStatusBadgeVariant(selectedShop.status)}>
-                    {getStatusText(selectedShop.status)}
+                  <Badge variant={getStatusBadgeVariant(selectedShop.shop_status)}>
+                    {getStatusText(selectedShop.shop_status)}
                   </Badge>
                 </div>
               </div>
@@ -524,12 +506,7 @@ const AdminShopsPage = () => {
 
             <div style={{ ...styles.infoItem, marginTop: '16px' }}>
               <div style={styles.infoLabel}>Địa chỉ</div>
-              <div style={styles.infoValue}>{selectedShop.address}</div>
-            </div>
-
-            <div style={{ ...styles.infoItem, marginTop: '16px' }}>
-              <div style={styles.infoLabel}>Mô tả</div>
-              <div style={styles.infoValue}>{selectedShop.description}</div>
+              <div style={styles.infoValue}>{selectedShop.address_shop || 'Chưa cập nhật'}</div>
             </div>
 
             {/* Stats */}

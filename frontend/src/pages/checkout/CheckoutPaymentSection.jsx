@@ -4,26 +4,25 @@ const CheckoutPaymentSection = ({ paymentMethods, selectedPayment, onSelectPayme
   return (
     <div style={styles.section}>
       <h2 style={styles.sectionTitle}>
-        <span>💳</span> Phương Thức Thanh Toán
+        <span>💳</span> Payment method
       </h2>
       {paymentMethods.map(method => (
         <div
-          key={method.id}
+          key={method}
           style={{
             ...styles.paymentOption,
-            ...(selectedPayment === method.id ? styles.paymentOptionActive : {})
+            ...(selectedPayment === method ? styles.paymentOptionActive : {})
           }}
-          onClick={() => onSelectPayment(method.id)}
+          onClick={() => onSelectPayment(method)}
         >
           <input
             type="radio"
             name="payment"
-            checked={selectedPayment === method.id}
-            onChange={() => onSelectPayment(method.id)}
+            checked={selectedPayment === method}
+            onChange={() => onSelectPayment(method)}
             style={styles.radio}
           />
-          <span style={styles.paymentIcon}>{method.icon}</span>
-          <span style={styles.paymentName}>{method.name}</span>
+          <span style={styles.paymentName}>{method}</span>
         </div>
       ))}
     </div>

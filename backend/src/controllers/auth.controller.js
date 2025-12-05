@@ -57,7 +57,7 @@ export const register = async (req, res) => {
     // Update Customer address if role is Customer
     if (role === 'Customer' && address) {
       await connection.query(
-        'UPDATE Customer SET address = ? WHERE account_id = ?',
+        'UPDATE Customer SET address = ? WHERE customer_id = ?',
         [address, accountId]
       );
     }
@@ -157,7 +157,7 @@ export const login = async (req, res) => {
         `SELECT 
           customer_id, address, add_phone, total_spent, total_order,
           fn_get_customer_total_spent(customer_id) as calculated_total_spent
-         FROM Customer WHERE account_id = ?`,
+         FROM Customer WHERE customer_id = ?`,
         [user.account_id]
       );
       if (customerData.length > 0) {
@@ -169,7 +169,7 @@ export const login = async (req, res) => {
           shop_id, shop_name, shop_phone, address_shop, rating, shop_status,
           fn_get_shop_revenue(shop_id) as total_revenue,
           fn_calculate_shop_rating(shop_id) as calculated_rating
-         FROM Shop WHERE account_id = ?`,
+         FROM Shop WHERE shop_id = ?`,
         [user.account_id]
       );
       if (shopData.length > 0) {
@@ -177,7 +177,7 @@ export const login = async (req, res) => {
       }
     } else if (user.role === 'Admin') {
       const [adminData] = await pool.query(
-        'SELECT admin_id, role as admin_role, note FROM Admin WHERE account_id = ?',
+        'SELECT admin_id, role as admin_role, note FROM Admin WHERE admin_id = ?',
         [user.account_id]
       );
       if (adminData.length > 0) {
@@ -243,7 +243,7 @@ export const getProfile = async (req, res) => {
         `SELECT 
           customer_id, address, add_phone, total_spent, total_order,
           fn_get_customer_total_spent(customer_id) as calculated_total_spent
-         FROM Customer WHERE account_id = ?`,
+         FROM Customer WHERE customer_id = ?`,
         [accountId]
       );
       if (customerData.length > 0) {
@@ -255,7 +255,7 @@ export const getProfile = async (req, res) => {
           shop_id, shop_name, shop_phone, address_shop, rating, shop_status,
           fn_get_shop_revenue(shop_id) as total_revenue,
           fn_calculate_shop_rating(shop_id) as calculated_rating
-         FROM Shop WHERE account_id = ?`,
+         FROM Shop WHERE shop_id = ?`,
         [accountId]
       );
       if (shopData.length > 0) {
@@ -263,7 +263,7 @@ export const getProfile = async (req, res) => {
       }
     } else if (user.role === 'Admin') {
       const [adminData] = await pool.query(
-        'SELECT admin_id, role as admin_role, note FROM Admin WHERE account_id = ?',
+        'SELECT admin_id, role as admin_role, note FROM Admin WHERE admin_id = ?',
         [accountId]
       );
       if (adminData.length > 0) {
@@ -338,7 +338,7 @@ export const updateProfile = async (req, res) => {
       if (customerFields.length > 0) {
         customerValues.push(accountId);
         await connection.query(
-          `UPDATE Customer SET ${customerFields.join(', ')} WHERE account_id = ?`,
+          `UPDATE Customer SET ${customerFields.join(', ')} WHERE customer_id = ?`,
           customerValues
         );
       }
@@ -362,7 +362,7 @@ export const updateProfile = async (req, res) => {
       if (shopFields.length > 0) {
         shopValues.push(accountId);
         await connection.query(
-          `UPDATE Shop SET ${shopFields.join(', ')} WHERE account_id = ?`,
+          `UPDATE Shop SET ${shopFields.join(', ')} WHERE shop_id = ?`,
           shopValues
         );
       }
@@ -440,3 +440,4 @@ export const changePassword = async (req, res) => {
     });
   }
 };
+

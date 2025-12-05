@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import shopStyles from './shopStyles';
+import { productService } from '../../api/productService';
+import createPrivateClient from '../../clients/private.client';
 
 const ProductFormPage = () => {
   const navigate = useNavigate();
   const { productId } = useParams();
-  const { isAuthenticated } = useSelector(state => state.auth);
+  const { isAuthenticated, token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
   const isEditing = Boolean(productId);
 
   const [loading, setLoading] = useState(isEditing);
@@ -27,45 +30,72 @@ const ProductFormPage = () => {
   });
 
   const [errors, setErrors] = useState({});
+  const [categories, setCategories] = useState([]);
 
-  const categories = [
-    { id: 1, name: 'Thời Trang Nam' },
-    { id: 2, name: 'Thời Trang Nữ' },
-    { id: 3, name: 'Điện Thoại & Phụ Kiện' },
-    { id: 4, name: 'Máy Tính & Laptop' },
-    { id: 5, name: 'Mỹ Phẩm' },
-    { id: 6, name: 'Nhà Cửa & Đời Sống' },
-    { id: 7, name: 'Thể Thao & Du Lịch' },
-    { id: 8, name: 'Đồ Chơi' },
-    { id: 9, name: 'Giày Dép' },
-    { id: 10, name: 'Túi Xách' },
-    { id: 11, name: 'Đồng Hồ' },
-    { id: 12, name: 'Sức Khỏe' }
-  ];
+  // Load categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { categoryService } = await import('../../api/categoryService');
+        const response = await categoryService.getCategories();
+        if (response.data?.data) {
+          // Backend returns either flat or categories tree
+          const catList = response.data.data.flat || response.data.data.categories || response.data.data;
+          const flatCategories = Array.isArray(catList) ? catList : [];
+          setCategories(flatCategories.map(cat => ({
+            id: cat.category_id,
+            name: cat.category_name
+          })));
+        }
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   // Load product data if editing
   useEffect(() => {
     if (isEditing && productId) {
-      // Mock fetching product data
-      setTimeout(() => {
-        const mockProduct = {
-          product_name: 'Áo thun nam cotton cao cấp Premium',
-          description: 'Áo thun chất liệu cotton 100%, mềm mại và thoáng mát. Phù hợp mọi vóc dáng.',
-          category_id: '1',
-          price: '129000',
-          oldPrice: '299000',
-          stock: '150',
-          status: 'Active',
-          images: [
-            'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop',
-            'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=400&h=400&fit=crop'
-          ],
-          colors: ['Trắng', 'Đen', 'Xám'],
-          sizes: ['S', 'M', 'L', 'XL']
-        };
-        setFormData(mockProduct);
-        setLoading(false);
-      }, 500);
+      const fetchProduct = async () => {
+        try {
+          setLoading(true);
+          const response = await productService.getProductById(productId);
+          if (response.data?.data) {
+            const product = response.data.data;
+            
+            // Parse variants from backend
+            const variants = product.variants || [];
+            const colors = [...new Set(variants.map(v => v.color))].filter(c => c);
+            const sizes = [...new Set(variants.map(v => v.type))].filter(s => s);
+            const images = variants.map(v => v.image_url).filter(img => img);
+            
+            // Get price and stock from first variant
+            const firstVariant = variants[0];
+            
+            setFormData({
+              product_name: product.product_name || '',
+              description: product.description || '',
+              category_id: product.category_id?.toString() || '',
+              price: (firstVariant?.price || 0).toString(),
+              oldPrice: (product.old_price || 0).toString(),
+              stock: (firstVariant?.stock || 0).toString(),
+              status: product.status || 'Active',
+              images: images.length > 0 ? images : [],
+              colors: colors.length > 0 ? colors : [''],
+              sizes: sizes.length > 0 ? sizes : ['']
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching product:', err);
+          alert('Cannot load product data.');
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchProduct();
+    } else {
+      setLoading(false);
     }
   }, [isEditing, productId]);
 
@@ -77,18 +107,32 @@ const ProductFormPage = () => {
     }
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, reader.result].slice(0, 8) // Max 8 images
-        }));
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of files) {
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+        
+        const response = await privateClient.post('/products/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        
+        if (response.data?.success && response.data?.data?.url) {
+          // Build full image URL
+          const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+          const fullImageUrl = baseURL.replace('/api', '') + response.data.data.url;
+          
+          setFormData(prev => ({
+            ...prev,
+            images: [...prev.images, fullImageUrl].slice(0, 8)
+          }));
+        }
+      } catch (error) {
+        console.error('Image upload error:', error);
+        alert('Failed to upload image: ' + error.message);
+      }
+    }
   };
 
   const handleDrag = (e) => {
@@ -106,15 +150,30 @@ const ProductFormPage = () => {
     e.stopPropagation();
     setDragActive(false);
     const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    
     files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, reader.result].slice(0, 8)
-        }));
-      };
-      reader.readAsDataURL(file);
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      privateClient.post('/products/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+        .then(response => {
+          if (response.data?.success && response.data?.data?.url) {
+            // Build full image URL
+            const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+            const fullImageUrl = baseURL.replace('/api', '') + response.data.data.url;
+            
+            setFormData(prev => ({
+              ...prev,
+              images: [...prev.images, fullImageUrl].slice(0, 8)
+            }));
+          }
+        })
+        .catch(error => {
+          console.error('Image upload error:', error);
+          alert('Failed to upload image: ' + error.message);
+        });
     });
   };
 
@@ -150,31 +209,47 @@ const ProductFormPage = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.product_name.trim()) newErrors.product_name = 'Vui lòng nhập tên sản phẩm';
-    if (!formData.category_id) newErrors.category_id = 'Vui lòng chọn danh mục';
-    if (!formData.price || parseInt(formData.price) <= 0) newErrors.price = 'Vui lòng nhập giá hợp lệ';
-    if (!formData.stock || parseInt(formData.stock) < 0) newErrors.stock = 'Vui lòng nhập số lượng kho';
-    if (formData.images.length === 0) newErrors.images = 'Vui lòng thêm ít nhất 1 hình ảnh';
+    if (!formData.product_name.trim()) newErrors.product_name = 'Please enter product name';
+    if (!formData.category_id) newErrors.category_id = 'Please select a category';
+    if (!formData.price || parseInt(formData.price) <= 0) newErrors.price = 'Please enter a valid price';
+    if (!formData.stock || parseInt(formData.stock) < 0) newErrors.stock = 'Please enter stock quantity';
+    if (formData.images.length === 0) newErrors.images = 'Please add at least one image';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    const productData = {
-      ...formData,
-      price: parseInt(formData.price),
-      oldPrice: formData.oldPrice ? parseInt(formData.oldPrice) : null,
-      stock: parseInt(formData.stock),
-      colors: formData.colors.filter(c => c.trim()),
-      sizes: formData.sizes.filter(s => s.trim())
-    };
+    try {
+      const productData = {
+        category_id: parseInt(formData.category_id),
+        product_name: formData.product_name,
+        description: formData.description,
+        variants: formData.colors.filter(c => c.trim()).map((color, idx) => ({
+          color,
+          type: formData.sizes[idx] || 'Standard',
+          price: parseInt(formData.price),
+          stock: parseInt(formData.stock),
+          image_url: formData.images[idx] || null
+        }))
+      };
 
-    console.log('Product data:', productData);
-    alert(isEditing ? 'Đã cập nhật sản phẩm!' : 'Đã tạo sản phẩm mới!');
-    navigate('/shop/products');
+      if (isEditing) {
+        // Update existing product
+        await productService.updateProduct(productId, productData, privateClient);
+        alert('Product updated successfully!');
+      } else {
+        // Create new product
+        await productService.createProduct(productData, privateClient);
+        alert('Product created successfully!');
+      }
+      navigate('/shop/products');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error: ' + (error.response?.data?.message || error.message));
+    }
   };
 
   if (!isAuthenticated) {
@@ -188,7 +263,7 @@ const ProductFormPage = () => {
         <div style={shopStyles.container}>
           <div style={{ textAlign: 'center', padding: '60px' }}>
             <div style={{ fontSize: '40px', marginBottom: '16px' }}>⏳</div>
-            <p>Đang tải thông tin sản phẩm...</p>
+            <p>Loading product data...</p>
           </div>
         </div>
       </div>
@@ -202,10 +277,10 @@ const ProductFormPage = () => {
         <div style={shopStyles.pageHeader}>
           <div>
             <h1 style={shopStyles.pageTitle}>
-              {isEditing ? '✏️ Chỉnh sửa sản phẩm' : '➕ Thêm sản phẩm mới'}
+              {isEditing ? 'Edit Product' : 'Add New Product'}
             </h1>
             <Link to="/shop/products" style={{ color: '#666', fontSize: '14px' }}>
-              ← Quay lại danh sách sản phẩm
+              ← Back to product list
             </Link>
           </div>
         </div>
@@ -216,11 +291,11 @@ const ProductFormPage = () => {
             <div>
               {/* Basic Info */}
               <div style={shopStyles.card}>
-                <h3 style={shopStyles.cardTitle}>📝 Thông tin cơ bản</h3>
+                <h3 style={shopStyles.cardTitle}>📝 Basic Information</h3>
                 
                 <div style={shopStyles.formSection}>
                   <label style={shopStyles.formLabel}>
-                    Tên sản phẩm <span style={{ color: '#dc3545' }}>*</span>
+                    Product Name <span style={{ color: '#dc3545' }}>*</span>
                   </label>
                   <input
                     type="text"
@@ -231,14 +306,14 @@ const ProductFormPage = () => {
                     }}
                     value={formData.product_name}
                     onChange={handleInputChange}
-                    placeholder="Nhập tên sản phẩm"
+                    placeholder="Enter product name"
                   />
                   {errors.product_name && <div style={shopStyles.formError}>{errors.product_name}</div>}
                 </div>
 
                 <div style={shopStyles.formSection}>
                   <label style={shopStyles.formLabel}>
-                    Danh mục <span style={{ color: '#dc3545' }}>*</span>
+                    Category <span style={{ color: '#dc3545' }}>*</span>
                   </label>
                   <select
                     name="category_id"
@@ -249,7 +324,7 @@ const ProductFormPage = () => {
                     value={formData.category_id}
                     onChange={handleInputChange}
                   >
-                    <option value="">-- Chọn danh mục --</option>
+                    <option value="">-- Select category --</option>
                     {categories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
@@ -258,28 +333,33 @@ const ProductFormPage = () => {
                 </div>
 
                 <div style={shopStyles.formSection}>
-                  <label style={shopStyles.formLabel}>Mô tả sản phẩm</label>
+                  <label style={shopStyles.formLabel}>Product Description</label>
                   <textarea
                     name="description"
                     style={shopStyles.formTextarea}
                     value={formData.description}
                     onChange={handleInputChange}
-                    placeholder="Mô tả chi tiết về sản phẩm..."
+                    placeholder="Detail description about product..."
                   />
                 </div>
               </div>
 
-              {/* Images */}
+              {/* Images - Upload */}
               <div style={shopStyles.card}>
                 <h3 style={shopStyles.cardTitle}>
-                  🖼️ Hình ảnh sản phẩm <span style={{ color: '#dc3545' }}>*</span>
+                  🖼️ Product Images <span style={{ color: '#dc3545' }}>*</span>
                 </h3>
                 
                 <div
                   style={{
-                    ...shopStyles.imageUpload,
-                    ...(dragActive ? shopStyles.imageUploadHover : {}),
-                    borderColor: errors.images ? '#dc3545' : (dragActive ? '#647A67' : '#ddd')
+                    border: '2px dashed #ddd',
+                    borderRadius: '8px',
+                    padding: '40px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    backgroundColor: dragActive ? '#f0f7f1' : 'white',
+                    borderColor: errors.images ? '#dc3545' : (dragActive ? '#647A67' : '#ddd'),
+                    transition: 'all 0.2s'
                   }}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
@@ -295,30 +375,67 @@ const ProductFormPage = () => {
                     style={{ display: 'none' }}
                     onChange={handleImageUpload}
                   />
-                  <div style={{ fontSize: '40px', marginBottom: '8px' }}>📷</div>
-                  <p style={{ color: '#666', marginBottom: '4px' }}>
-                    Kéo thả hình ảnh vào đây hoặc click để chọn
+                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>📷</div>
+                  <p style={{ color: '#333', marginBottom: '4px', fontWeight: '500' }}>
+                    Drag and drop images here or click to select
                   </p>
                   <p style={{ fontSize: '12px', color: '#999' }}>
-                    Tối đa 8 hình ảnh, định dạng JPG, PNG
+                    JPG, PNG or WebP. Max 5MB per file. Up to 8 images.
                   </p>
                 </div>
-                {errors.images && <div style={shopStyles.formError}>{errors.images}</div>}
 
                 {formData.images.length > 0 && (
-                  <div style={shopStyles.imagePreviewGrid}>
-                    {formData.images.map((img, index) => (
-                      <div key={index} style={shopStyles.imagePreview}>
-                        <img src={img} alt={`Preview ${index}`} style={shopStyles.imagePreviewImg} />
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                    gap: '12px',
+                    marginTop: '16px'
+                  }}>
+                    {formData.images.map((url, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          position: 'relative',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          backgroundColor: '#f0f0f0',
+                          aspectRatio: '1',
+                          border: index === 0 ? '2px solid #647A67' : '1px solid #ddd'
+                        }}
+                      >
+                        <img
+                          src={url}
+                          alt={`Preview ${index}`}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                        />
                         <button
                           type="button"
-                          style={shopStyles.imageRemoveBtn}
+                          style={{
+                            position: 'absolute',
+                            top: '4px',
+                            right: '4px',
+                            backgroundColor: 'rgba(220, 53, 69, 0.9)',
+                            color: 'white',
+                            border: 'none',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
                           onClick={() => removeImage(index)}
                         >
-                          ×
+                          ✕
                         </button>
                         {index === 0 && (
-                          <span style={{
+                          <div style={{
                             position: 'absolute',
                             bottom: '4px',
                             left: '4px',
@@ -326,24 +443,26 @@ const ProductFormPage = () => {
                             color: 'white',
                             padding: '2px 6px',
                             borderRadius: '4px',
-                            fontSize: '10px'
+                            fontSize: '10px',
+                            fontWeight: '500'
                           }}>
-                            Ảnh chính
-                          </span>
+                            Main
+                          </div>
                         )}
                       </div>
                     ))}
                   </div>
                 )}
+                {errors.images && <div style={shopStyles.formError}>{errors.images}</div>}
               </div>
 
               {/* Variants */}
               <div style={shopStyles.card}>
-                <h3 style={shopStyles.cardTitle}>🎨 Phân loại hàng</h3>
+                <h3 style={shopStyles.cardTitle}>🎨 Variants</h3>
                 
                 {/* Colors */}
                 <div style={shopStyles.formSection}>
-                  <label style={shopStyles.formLabel}>Màu sắc</label>
+                  <label style={shopStyles.formLabel}>Colors</label>
                   <div style={shopStyles.variantSection}>
                     {formData.colors.map((color, index) => (
                       <div key={index} style={shopStyles.variantRow}>
@@ -352,7 +471,7 @@ const ProductFormPage = () => {
                           style={shopStyles.variantInput}
                           value={color}
                           onChange={(e) => handleVariantChange('colors', index, e.target.value)}
-                          placeholder="VD: Trắng, Đen, Xanh..."
+                          placeholder="e.g., White, Black, Blue..."
                         />
                         <button
                           type="button"
@@ -360,7 +479,7 @@ const ProductFormPage = () => {
                           onClick={() => removeVariant('colors', index)}
                           disabled={formData.colors.length <= 1}
                         >
-                          🗑️
+                          Delete
                         </button>
                       </div>
                     ))}
@@ -369,14 +488,14 @@ const ProductFormPage = () => {
                       style={shopStyles.addVariantBtn}
                       onClick={() => addVariant('colors')}
                     >
-                      ➕ Thêm màu
+                      More Colors
                     </button>
                   </div>
                 </div>
 
                 {/* Sizes */}
                 <div style={shopStyles.formSection}>
-                  <label style={shopStyles.formLabel}>Kích cỡ</label>
+                  <label style={shopStyles.formLabel}>Sizes</label>
                   <div style={shopStyles.variantSection}>
                     {formData.sizes.map((size, index) => (
                       <div key={index} style={shopStyles.variantRow}>
@@ -393,7 +512,7 @@ const ProductFormPage = () => {
                           onClick={() => removeVariant('sizes', index)}
                           disabled={formData.sizes.length <= 1}
                         >
-                          🗑️
+                          Delete
                         </button>
                       </div>
                     ))}
@@ -402,7 +521,7 @@ const ProductFormPage = () => {
                       style={shopStyles.addVariantBtn}
                       onClick={() => addVariant('sizes')}
                     >
-                      ➕ Thêm kích cỡ
+                      More Sizes
                     </button>
                   </div>
                 </div>
@@ -413,11 +532,11 @@ const ProductFormPage = () => {
             <div>
               {/* Pricing */}
               <div style={shopStyles.card}>
-                <h3 style={shopStyles.cardTitle}>💰 Giá bán</h3>
+                <h3 style={shopStyles.cardTitle}>💰 Price</h3>
                 
                 <div style={shopStyles.formSection}>
                   <label style={shopStyles.formLabel}>
-                    Giá bán <span style={{ color: '#dc3545' }}>*</span>
+                    Price <span style={{ color: '#dc3545' }}>*</span>
                   </label>
                   <input
                     type="number"
@@ -432,11 +551,11 @@ const ProductFormPage = () => {
                     min="0"
                   />
                   {errors.price && <div style={shopStyles.formError}>{errors.price}</div>}
-                  <div style={shopStyles.formHelper}>Đơn vị: VNĐ</div>
+                  <div style={shopStyles.formHelper}>Unit: VND</div>
                 </div>
 
                 <div style={shopStyles.formSection}>
-                  <label style={shopStyles.formLabel}>Giá gốc (trước giảm giá)</label>
+                  <label style={shopStyles.formLabel}>Original Price (before discount)</label>
                   <input
                     type="number"
                     name="oldPrice"
@@ -446,7 +565,7 @@ const ProductFormPage = () => {
                     placeholder="0"
                     min="0"
                   />
-                  <div style={shopStyles.formHelper}>Để trống nếu không có giảm giá</div>
+                  <div style={shopStyles.formHelper}>Leave blank if no discount</div>
                 </div>
 
                 {formData.oldPrice && parseInt(formData.oldPrice) > parseInt(formData.price || 0) && (
@@ -457,7 +576,7 @@ const ProductFormPage = () => {
                     fontSize: '14px',
                     color: '#155724'
                   }}>
-                    🏷️ Giảm giá: {Math.round((1 - parseInt(formData.price || 0) / parseInt(formData.oldPrice)) * 100)}%
+                    🏷️ Discount: {Math.round((1 - parseInt(formData.price || 0) / parseInt(formData.oldPrice)) * 100)}%
                   </div>
                 )}
               </div>
@@ -468,7 +587,7 @@ const ProductFormPage = () => {
                 
                 <div style={shopStyles.formSection}>
                   <label style={shopStyles.formLabel}>
-                    Số lượng <span style={{ color: '#dc3545' }}>*</span>
+                    Stock <span style={{ color: '#dc3545' }}>*</span>
                   </label>
                   <input
                     type="number"
@@ -488,18 +607,18 @@ const ProductFormPage = () => {
 
               {/* Status */}
               <div style={shopStyles.card}>
-                <h3 style={shopStyles.cardTitle}>⚙️ Trạng thái</h3>
+                <h3 style={shopStyles.cardTitle}>Status</h3>
                 
                 <div style={shopStyles.formSection}>
-                  <label style={shopStyles.formLabel}>Trạng thái sản phẩm</label>
+                  <label style={shopStyles.formLabel}>Product Status</label>
                   <select
                     name="status"
                     style={shopStyles.formSelect}
                     value={formData.status}
                     onChange={handleInputChange}
                   >
-                    <option value="Active">Đang bán</option>
-                    <option value="Inactive">Ngừng bán</option>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
                   </select>
                 </div>
               </div>
@@ -512,7 +631,7 @@ const ProductFormPage = () => {
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#556B5A'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = '#647A67'}
                 >
-                  {isEditing ? '💾 Cập nhật sản phẩm' : '✅ Tạo sản phẩm'}
+                  {isEditing ? 'Update Product' : 'Create Product'}
                 </button>
                 
                 <button
@@ -520,7 +639,7 @@ const ProductFormPage = () => {
                   style={{ ...shopStyles.secondaryBtn, width: '100%', justifyContent: 'center', marginTop: '12px' }}
                   onClick={() => navigate('/shop/products')}
                 >
-                  Hủy
+                  Cancel
                 </button>
               </div>
             </div>

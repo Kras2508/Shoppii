@@ -51,4 +51,9 @@ export const productService = {
   deleteVariant: (productId, variantId, privateClient) => {
     return privateClient.delete(`/products/${productId}/variants/${variantId}`)
   },
+
+  // Get product statistics (uses sp_get_product_statistics)
+  getProductStatistics: (params = {}) => {
+    return publicClient.get('/products/statistics', { params })
+  },
 }

@@ -1,72 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import adminStyles from './adminStyles.js';
+import { adminService } from '../../api/adminService.js';
 import Modal from '../../components/common/Modal';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Avatar from '../../components/common/Avatar';
+import createPrivateClient from '../../clients/private.client';
 
 const AdminReviewsPage = () => {
+  const { token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [ratingFilter, setRatingFilter] = useState('all');
   const [selectedReview, setSelectedReview] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data
-  const [reviews, setReviews] = useState([
-    {
-      id: 1, review_id: 'REV001', customer_name: 'Nguyễn Văn A', product_name: 'Áo thun nam basic',
-      shop_name: 'Fashion House', rating: 5, comment: 'Sản phẩm rất tốt, chất lượng vải đẹp, giao hàng nhanh!',
-      status: 'Active', created_at: '2024-04-20', report_count: 0
-    },
-    {
-      id: 2, review_id: 'REV002', customer_name: 'Trần Thị B', product_name: 'iPhone 15 Pro Max 256GB',
-      shop_name: 'Tech World', rating: 5, comment: 'Hàng chính hãng, đóng gói cẩn thận, shop uy tín!',
-      status: 'Active', created_at: '2024-04-19', report_count: 0
-    },
-    {
-      id: 3, review_id: 'REV003', customer_name: 'Lê Minh C', product_name: 'Son môi MAC Ruby Woo',
-      shop_name: 'Beauty Corner', rating: 4, comment: 'Màu đẹp, giữ màu lâu. Trừ 1 sao vì giao hơi chậm.',
-      status: 'Active', created_at: '2024-04-18', report_count: 0
-    },
-    {
-      id: 4, review_id: 'REV004', customer_name: 'Anonymous', product_name: 'Túi xách nữ Gucci',
-      shop_name: 'Fashion House', rating: 1, comment: 'HÀNG FAKE! LỪAĐẢO! MUA VỀ KHÔNG GIỐNG HÌNH! Ai mua thì coi chừng...',
-      status: 'Reported', created_at: '2024-04-21', report_count: 5, report_reason: 'Nghi ngờ đánh giá giả, gây hại uy tín shop'
-    },
-    {
-      id: 5, review_id: 'REV005', customer_name: 'Phạm Văn D', product_name: 'Giày Nike Air Max',
-      shop_name: 'Sports Zone', rating: 5, comment: 'Giày đẹp, đúng size, chất lượng tốt!',
-      status: 'Active', created_at: '2024-04-17', report_count: 0
-    },
-    {
-      id: 6, review_id: 'REV006', customer_name: 'Spam Account', product_name: 'Bàn làm việc gỗ',
-      shop_name: 'Home & Living', rating: 5, comment: 'Mua hàng ở shop khác rẻ hơn nhiều, link: fakeshop.com/promo',
-      status: 'Reported', created_at: '2024-04-20', report_count: 8, report_reason: 'Spam quảng cáo shop khác'
-    },
-    {
-      id: 7, review_id: 'REV007', customer_name: 'Hoàng E', product_name: 'Tai nghe Sony WH-1000XM5',
-      shop_name: 'Tech World', rating: 2, comment: 'Hàng bị lỗi, chờ đổi trả...',
-      status: 'Active', created_at: '2024-04-16', report_count: 0
-    },
-    {
-      id: 8, review_id: 'REV008', customer_name: 'Bad User', product_name: 'Kem chống nắng Anessa',
-      shop_name: 'Beauty Corner', rating: 1, comment: '*** chửi shop *** từ ngữ không phù hợp ***',
-      status: 'Hidden', created_at: '2024-04-15', report_count: 12, report_reason: 'Ngôn ngữ không phù hợp',
-      hidden_reason: 'Vi phạm quy tắc cộng đồng'
-    },
-    {
-      id: 9, review_id: 'REV009', customer_name: 'Vũ Thị F', product_name: 'Áo thun nam basic',
-      shop_name: 'Fashion House', rating: 4, comment: 'Áo đẹp, vải mát. Màu hơi khác với hình một chút.',
-      status: 'Active', created_at: '2024-04-14', report_count: 0
-    },
-    {
-      id: 10, review_id: 'REV010', customer_name: 'Nguyễn Văn G', product_name: 'iPhone 15 Pro Max 256GB',
-      shop_name: 'Tech World', rating: 5, comment: '5 sao cho shop! Sản phẩm chính hãng 100%!',
-      status: 'Active', created_at: '2024-04-13', report_count: 0
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        setLoading(true);
+        const response = await adminService.getAllReviews(privateClient, {
+          search: searchTerm || undefined
+        });
+        if (response.data?.data?.reviews) {
+          setReviews(response.data.data.reviews);
+        }
+      } catch (err) {
+        console.error('Error fetching reviews:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchReviews();
     }
-  ]);
+  }, [token, searchTerm]);
 
   const filteredReviews = reviews.filter(review => {
     const matchSearch = 

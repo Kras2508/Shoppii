@@ -7,7 +7,7 @@ export const getCart = async (req, res) => {
 
     // Get customer_id from account
     const [customers] = await pool.query(
-      'SELECT customer_id FROM Customer WHERE account_id = ?',
+      'SELECT customer_id FROM Customer WHERE customer_id = ?',
       [accountId]
     );
 
@@ -135,7 +135,7 @@ export const addToCart = async (req, res) => {
 
     // Get customer_id from account
     const [customers] = await pool.query(
-      'SELECT customer_id FROM Customer WHERE account_id = ?',
+      'SELECT customer_id FROM Customer WHERE customer_id = ?',
       [accountId]
     );
 
@@ -250,7 +250,7 @@ export const updateCartItem = async (req, res) => {
 
     // Get customer_id from account
     const [customers] = await pool.query(
-      'SELECT customer_id FROM Customer WHERE account_id = ?',
+      'SELECT customer_id FROM Customer WHERE customer_id = ?',
       [accountId]
     );
 
@@ -324,7 +324,7 @@ export const removeFromCart = async (req, res) => {
 
     // Get customer_id from account
     const [customers] = await pool.query(
-      'SELECT customer_id FROM Customer WHERE account_id = ?',
+      'SELECT customer_id FROM Customer WHERE customer_id = ?',
       [accountId]
     );
 
@@ -373,7 +373,7 @@ export const clearCart = async (req, res) => {
 
     // Get customer_id from account
     const [customers] = await pool.query(
-      'SELECT customer_id FROM Customer WHERE account_id = ?',
+      'SELECT customer_id FROM Customer WHERE customer_id = ?',
       [accountId]
     );
 
@@ -404,3 +404,5 @@ export const clearCart = async (req, res) => {
     });
   }
 };
+
+

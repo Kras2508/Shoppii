@@ -34,9 +34,15 @@ const ShopOrdersPage = () => {
             customer_name: order.customer_name || 'Khách hàng',
             customer_phone: order.customer_phone || '',
             customer_address: order.shipping_address,
-            items: order.items || [],
-            total: order.total_amount,
-            shipping_fee: order.shipping_fee || 0,
+            items: (order.items || []).map(item => ({
+              name: item.product_name || '',
+              image: item.variant_image || item.product_image || '',
+              variant: item.color && item.type ? `${item.color} - ${item.type}` : '',
+              quantity: item.quantity || 1,
+              price: parseFloat(item.price_at_purchase) || 0
+            })),
+            total: parseFloat(order.total_amount) || 0,
+            shipping_fee: parseFloat(order.shipping_fee) || 0,
             status: order.status,
             payment_method: order.payment_method,
             created_at: new Date(order.created_at).toLocaleString('vi-VN'),
@@ -45,7 +51,7 @@ const ShopOrdersPage = () => {
         }
       } catch (err) {
         console.error('Error fetching orders:', err);
-        setError('Không thể tải danh sách đơn hàng');
+        setError('Cannot load orders');
       } finally {
         setLoading(false);
       }
@@ -78,19 +84,20 @@ const ShopOrdersPage = () => {
       fontWeight: '500',
       color: '#666',
       cursor: 'pointer',
-      borderBottom: '2px solid transparent',
       marginBottom: '-2px',
       transition: 'all 0.2s',
       whiteSpace: 'nowrap',
       backgroundColor: 'transparent',
-      border: 'none',
+      borderWidth: '0 0 2px 0',
+      borderStyle: 'solid',
+      borderColor: 'transparent',
       display: 'flex',
       alignItems: 'center',
       gap: '8px'
     },
     tabActive: {
       color: '#647A67',
-      borderBottomColor: '#647A67'
+      borderColor: 'transparent transparent #647A67 transparent'
     },
     tabBadge: {
       backgroundColor: '#eee',
@@ -339,16 +346,16 @@ const ShopOrdersPage = () => {
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'Pending': return '⏳ Chờ xác nhận';
-      case 'Processing': return '📦 Đang xử lý';
-      case 'Shipped': return '🚚 Đang giao';
-      case 'Delivered': return '✅ Đã giao';
-      case 'Cancelled': return '❌ Đã hủy';
+      case 'Pending': return '⏳ Pending';
+      case 'Processing': return '📦 Processing';
+      case 'Shipped': return '🚚 Shipped';
+      case 'Delivered': return '✅ Delivered';
+      case 'Cancelled': return '❌ Cancelled';
       default: return status;
     }
   };
 
-  const formatPrice = (price) => price.toLocaleString('vi-VN') + 'đ';
+  const formatPrice = (price) => price.toLocaleString('vi-VN') + ' VND';
 
   // Filter orders
   const filteredOrders = orders.filter(order => {
@@ -362,18 +369,33 @@ const ShopOrdersPage = () => {
     return true;
   });
 
-  const handleUpdateStatus = (orderId, newStatus) => {
-    // In real app, call API
-    alert(`Đơn hàng #${orderId} đã được cập nhật thành ${newStatus}`);
+  const handleUpdateStatus = async (orderId, newStatus) => {
+    try {
+      const response = await privateClient.put(`/orders/${orderId}/status`, {
+        status: newStatus
+      });
+      if (response.data?.success) {
+        // Update local state
+        setOrders(orders.map(o => 
+          o.order_id === orderId 
+            ? { ...o, status: newStatus }
+            : o
+        ));
+        console.log(`Order #${orderId} updated to ${newStatus}`);
+      }
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      alert('Error: ' + (error.response?.data?.message || error.message));
+    }
   };
 
   const tabs = [
-    { key: 'all', label: 'Tất cả', count: stats.all },
-    { key: 'pending', label: 'Chờ xác nhận', count: stats.pending },
-    { key: 'processing', label: 'Đang xử lý', count: stats.processing },
-    { key: 'shipped', label: 'Đang giao', count: stats.shipped },
-    { key: 'delivered', label: 'Đã giao', count: stats.delivered },
-    { key: 'cancelled', label: 'Đã hủy', count: stats.cancelled }
+    { key: 'all', label: 'All', count: stats.all },
+    { key: 'pending', label: 'Pending', count: stats.pending },
+    { key: 'processing', label: 'Processing', count: stats.processing },
+    { key: 'shipped', label: 'Shipped', count: stats.shipped },
+    { key: 'delivered', label: 'Delivered', count: stats.delivered },
+    { key: 'cancelled', label: 'Cancelled', count: stats.cancelled }
   ];
 
   return (
@@ -381,7 +403,7 @@ const ShopOrdersPage = () => {
       <div style={styles.container}>
         {/* Header */}
         <div style={styles.pageHeader}>
-          <h1 style={styles.pageTitle}>📋 Quản lý đơn hàng</h1>
+          <h1 style={styles.pageTitle}>Order Management</h1>
         </div>
 
         {/* Tabs */}
@@ -400,7 +422,6 @@ const ShopOrdersPage = () => {
                 ...styles.tabBadge,
                 ...(filterStatus === tab.key ? styles.tabBadgeActive : {})
               }}>
-                {tab.count}
               </span>
             </button>
           ))}
@@ -410,7 +431,7 @@ const ShopOrdersPage = () => {
         <div style={styles.searchBar}>
           <input
             type="text"
-            placeholder="🔍 Tìm theo mã đơn, tên khách hàng, SĐT..."
+            placeholder="Searching based on order id, customer name, phone number..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={styles.searchInput}
@@ -421,7 +442,7 @@ const ShopOrdersPage = () => {
         {filteredOrders.length === 0 ? (
           <div style={{ ...styles.card, textAlign: 'center', padding: '60px 20px' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>📦</div>
-            <div style={{ fontSize: '16px', color: '#666' }}>Không có đơn hàng nào</div>
+            <div style={{ fontSize: '16px', color: '#666' }}>No orders found</div>
           </div>
         ) : (
           filteredOrders.map(order => (
@@ -429,7 +450,7 @@ const ShopOrdersPage = () => {
               {/* Header */}
               <div style={styles.orderHeader}>
                 <div>
-                  <span style={styles.orderId}>Đơn hàng #{order.order_id}</span>
+                  <span style={styles.orderId}>Order #{order.order_id}</span>
                   <span style={{ marginLeft: '12px', ...styles.orderDate }}>{order.created_at}</span>
                 </div>
                 <span style={getStatusStyle(order.status)}>
@@ -476,8 +497,8 @@ const ShopOrdersPage = () => {
               {/* Footer */}
               <div style={styles.orderFooter}>
                 <div>
-                  <span style={{ color: '#888', fontSize: '14px' }}>Tổng tiền: </span>
-                  <span style={styles.orderTotal}>{formatPrice(order.total + order.shipping_fee)}</span>
+                  <span style={{ color: '#888', fontSize: '14px' }}>Total: </span>
+                  <span style={styles.orderTotal}>{formatPrice(order.total)}</span>
                   {order.shipping_fee > 0 && (
                     <span style={{ color: '#888', fontSize: '12px', marginLeft: '8px' }}>
                       (Ship: {formatPrice(order.shipping_fee)})
@@ -489,7 +510,7 @@ const ShopOrdersPage = () => {
                     style={{ ...styles.actionBtn, backgroundColor: '#f0f0f0', color: '#333' }}
                     onClick={() => setShowOrderDetail(order)}
                   >
-                    👁️ Chi tiết
+                    Details
                   </button>
                   
                   {order.status === 'Pending' && (
@@ -498,13 +519,13 @@ const ShopOrdersPage = () => {
                         style={{ ...styles.actionBtn, backgroundColor: '#647A67', color: 'white' }}
                         onClick={() => handleUpdateStatus(order.order_id, 'Processing')}
                       >
-                        ✓ Xác nhận
+                        Confirm
                       </button>
                       <button
                         style={{ ...styles.actionBtn, backgroundColor: '#dc3545', color: 'white' }}
                         onClick={() => handleUpdateStatus(order.order_id, 'Cancelled')}
                       >
-                        ✕ Hủy
+                        Cancel
                       </button>
                     </>
                   )}
@@ -514,7 +535,7 @@ const ShopOrdersPage = () => {
                       style={{ ...styles.actionBtn, backgroundColor: '#647A67', color: 'white' }}
                       onClick={() => handleUpdateStatus(order.order_id, 'Shipped')}
                     >
-                      🚚 Giao hàng
+                      Ship
                     </button>
                   )}
                   
@@ -523,7 +544,7 @@ const ShopOrdersPage = () => {
                       style={{ ...styles.actionBtn, backgroundColor: '#28a745', color: 'white' }}
                       onClick={() => handleUpdateStatus(order.order_id, 'Delivered')}
                     >
-                      ✅ Đã giao
+                      Delivered
                     </button>
                   )}
                 </div>
@@ -538,7 +559,7 @@ const ShopOrdersPage = () => {
             <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
               <div style={styles.modalHeader}>
                 <span style={styles.modalTitle}>
-                  Chi tiết đơn hàng #{showOrderDetail.order_id}
+                  Order Details #{showOrderDetail.order_id}
                 </span>
                 <button style={styles.modalClose} onClick={() => setShowOrderDetail(null)}>×</button>
               </div>
@@ -552,7 +573,7 @@ const ShopOrdersPage = () => {
 
                 {/* Timeline */}
                 <div style={{ marginBottom: '24px' }}>
-                  <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>📍 Trạng thái đơn hàng</h4>
+                  <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>📍 Order Status</h4>
                   <div style={styles.timeline}>
                     {['Pending', 'Processing', 'Shipped', 'Delivered'].map((status, idx) => {
                       const isActive = ['Pending', 'Processing', 'Shipped', 'Delivered'].indexOf(showOrderDetail.status) >= idx;
@@ -574,17 +595,17 @@ const ShopOrdersPage = () => {
 
                 {/* Customer */}
                 <div style={{ marginBottom: '20px' }}>
-                  <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>👤 Thông tin khách hàng</h4>
+                  <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Customer Information</h4>
                   <div style={{ backgroundColor: '#f9f9f9', padding: '14px', borderRadius: '8px', fontSize: '14px' }}>
-                    <div style={{ marginBottom: '8px' }}><strong>Tên:</strong> {showOrderDetail.customer_name}</div>
-                    <div style={{ marginBottom: '8px' }}><strong>SĐT:</strong> {showOrderDetail.customer_phone}</div>
-                    <div><strong>Địa chỉ:</strong> {showOrderDetail.customer_address}</div>
+                    <div style={{ marginBottom: '8px' }}><strong>Name:</strong> {showOrderDetail.customer_name}</div>
+                    <div style={{ marginBottom: '8px' }}><strong>Phone:</strong> {showOrderDetail.customer_phone}</div>
+                    <div><strong>Address:</strong> {showOrderDetail.customer_address}</div>
                   </div>
                 </div>
 
                 {/* Items */}
                 <div style={{ marginBottom: '20px' }}>
-                  <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>📦 Sản phẩm</h4>
+                  <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Products</h4>
                   {showOrderDetail.items.map((item, idx) => (
                     <div key={idx} style={{ display: 'flex', gap: '12px', padding: '12px', backgroundColor: '#f9f9f9', borderRadius: '8px', marginBottom: '8px' }}>
                       <img src={item.image} alt="" style={{ width: '50px', height: '50px', borderRadius: '6px', objectFit: 'cover' }} />
@@ -602,17 +623,9 @@ const ShopOrdersPage = () => {
 
                 {/* Summary */}
                 <div style={{ backgroundColor: '#f0f7f1', padding: '16px', borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                    <span>Tạm tính:</span>
-                    <span>{formatPrice(showOrderDetail.total)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                    <span>Phí vận chuyển:</span>
-                    <span>{showOrderDetail.shipping_fee > 0 ? formatPrice(showOrderDetail.shipping_fee) : 'Miễn phí'}</span>
-                  </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '600', paddingTop: '8px', borderTop: '1px solid #cde5d0' }}>
-                    <span>Tổng cộng:</span>
-                    <span style={{ color: '#647A67' }}>{formatPrice(showOrderDetail.total + showOrderDetail.shipping_fee)}</span>
+                    <span>Total:</span>
+                    <span style={{ color: '#647A67' }}>{formatPrice(showOrderDetail.total)}</span>
                   </div>
                 </div>
               </div>

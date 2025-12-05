@@ -122,10 +122,10 @@ const ProductListPage = () => {
   const getPageTitle = () => {
     if (categoryParam) {
       const cat = categories.find(c => c.category_id === parseInt(categoryParam));
-      return cat ? `${cat.category_name}` : 'Sản Phẩm';
+      return cat ? `${cat.category_name}` : 'Products';
     }
-    if (searchParam) return `Kết quả tìm kiếm: "${searchParam}"`;
-    return 'Tất Cả Sản Phẩm';
+    if (searchParam) return `Result: "${searchParam}"`;
+    return 'All Products';
   };
 
   const styles = {

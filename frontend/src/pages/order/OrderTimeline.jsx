@@ -3,9 +3,9 @@ import React from 'react';
 const OrderTimeline = ({ order, styles }) => {
   // Order status theo database: Processing, Shipped, Delivered, Cancelled
   const statusSteps = [
-    { key: 'Processing', label: 'Đang xử lý', icon: '📦', description: 'Đơn hàng đang được chuẩn bị' },
-    { key: 'Shipped', label: 'Đang giao', icon: '🚚', description: 'Đơn hàng đang trên đường giao' },
-    { key: 'Delivered', label: 'Đã giao', icon: '✅', description: 'Giao hàng thành công' }
+    { key: 'Processing', label: 'Processing', icon: '📦', description: 'Order is being prepared' },
+    { key: 'Shipped', label: 'Shipping', icon: '🚚', description: 'Order is being shipped' },
+    { key: 'Delivered', label: 'Delivered', icon: '✅', description: 'Order has been delivered' }
   ];
 
   const getStatusIndex = (status) => {
@@ -18,13 +18,13 @@ const OrderTimeline = ({ order, styles }) => {
 
   return (
     <div style={styles.timelineSection}>
-      <h3 style={styles.timelineTitle}>Trạng Thái Đơn Hàng</h3>
+      <h3 style={styles.timelineTitle}>Order Status</h3>
       
       {isCancelled ? (
         <div style={styles.cancelledBox}>
           <span style={styles.cancelledIcon}>❌</span>
           <div>
-            <div style={styles.cancelledTitle}>Đơn hàng đã bị hủy</div>
+            <div style={styles.cancelledTitle}>This order has been cancelled</div>
             <div style={styles.cancelledDate}>
               {new Date(order.updated_at).toLocaleString('vi-VN')}
             </div>
@@ -79,7 +79,7 @@ const OrderTimeline = ({ order, styles }) => {
                     {step.description}
                   </div>
                   {isCurrent && order.status !== 'Delivered' && (
-                    <div style={styles.currentBadge}>Hiện tại</div>
+                    <div style={styles.currentBadge}>Now</div>
                   )}
                 </div>
               </div>

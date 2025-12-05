@@ -44,7 +44,7 @@ const OrderDetailProducts = ({ items, styles, formatPrice }) => {
               }}
             >
               <img
-                src={item.image_url || item.image || 'https://via.placeholder.com/80'}
+                src={item.variant_image || item.product_image || item.image_url || item.image || '/placeholder.png'}
                 alt={item.product_name}
                 style={styles.productImage}
               />

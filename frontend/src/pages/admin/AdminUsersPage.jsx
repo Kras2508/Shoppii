@@ -1,30 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import adminStyles from './adminStyles.js';
+import { adminService } from '../../api/adminService.js';
 import Modal from '../../components/common/Modal';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
+import createPrivateClient from '../../clients/private.client';
 
 const AdminUsersPage = () => {
+  const { token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - sẽ thay bằng API calls sau
-  const [users, setUsers] = useState([
-    { id: 1, account_id: 'ACC001', email: 'nguyenvana@gmail.com', full_name: 'Nguyễn Văn A', role: 'Customer', status: 'Active', created_at: '2024-01-15', total_orders: 12, total_spent: 5600000 },
-    { id: 2, account_id: 'ACC002', email: 'tranthib@gmail.com', full_name: 'Trần Thị B', role: 'Customer', status: 'Active', created_at: '2024-02-20', total_orders: 8, total_spent: 3200000 },
-    { id: 3, account_id: 'ACC003', email: 'shop.fashion@gmail.com', full_name: 'Fashion House', role: 'Shop', status: 'Active', created_at: '2024-01-10', total_orders: 1245, total_spent: 0 },
-    { id: 4, account_id: 'ACC004', email: 'leminhc@gmail.com', full_name: 'Lê Minh C', role: 'Customer', status: 'Ban', created_at: '2024-03-05', total_orders: 3, total_spent: 890000 },
-    { id: 5, account_id: 'ACC005', email: 'shop.tech@gmail.com', full_name: 'Tech World', role: 'Shop', status: 'Active', created_at: '2024-01-22', total_orders: 980, total_spent: 0 },
-    { id: 6, account_id: 'ACC006', email: 'phamvand@gmail.com', full_name: 'Phạm Văn D', role: 'Customer', status: 'Active', created_at: '2024-04-01', total_orders: 5, total_spent: 1500000 },
-    { id: 7, account_id: 'ACC007', email: 'admin@gmail.com', full_name: 'System Admin', role: 'Admin', status: 'Active', created_at: '2024-01-01', total_orders: 0, total_spent: 0 },
-    { id: 8, account_id: 'ACC008', email: 'hoange@gmail.com', full_name: 'Hoàng E', role: 'Customer', status: 'Ban', created_at: '2024-02-28', total_orders: 2, total_spent: 450000 },
-    { id: 9, account_id: 'ACC009', email: 'shop.beauty@gmail.com', full_name: 'Beauty Corner', role: 'Shop', status: 'Active', created_at: '2024-02-15', total_orders: 654, total_spent: 0 },
-    { id: 10, account_id: 'ACC010', email: 'vuthif@gmail.com', full_name: 'Vũ Thị F', role: 'Customer', status: 'Active', created_at: '2024-04-10', total_orders: 15, total_spent: 7800000 }
-  ]);
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await adminService.getAllUsers(privateClient, {
+          role: roleFilter === 'all' ? undefined : roleFilter,
+          status: statusFilter === 'all' ? undefined : statusFilter,
+          search: searchTerm || undefined
+        });
+        if (response.data?.data?.users) {
+          setUsers(response.data.data.users);
+        }
+      } catch (err) {
+        console.error('Error fetching users:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchUsers();
+    }
+  }, [token, roleFilter, statusFilter, searchTerm]);
 
   const filteredUsers = users.filter(user => {
     const matchSearch = 

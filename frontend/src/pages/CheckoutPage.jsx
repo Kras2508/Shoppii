@@ -33,6 +33,7 @@ const CheckoutPage = () => {
   const [checkoutItems, setCheckoutItems] = useState(location.state?.items || []);
   const [shippingOptions, setShippingOptions] = useState([]);
   const [vouchers, setVouchers] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
   const [selectedShipping, setSelectedShipping] = useState(null);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [selectedPayment, setSelectedPayment] = useState('COD');
@@ -41,6 +42,14 @@ const CheckoutPage = () => {
   const [showVoucherDropdown, setShowVoucherDropdown] = useState(false);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(true);
+  
+  // Backend calculated values
+  const [orderSummary, setOrderSummary] = useState({
+    subtotal: 0,
+    shipping_fee: 0,
+    discount_amount: 0,
+    total_amount: 0
+  });
 
   // Fetch shipping methods and vouchers
   useEffect(() => {
@@ -64,7 +73,11 @@ const CheckoutPage = () => {
 
         // Fetch vouchers
         const voucherRes = await voucherService.getVouchers();
-        setVouchers(voucherRes.data?.data || []);
+        setVouchers(voucherRes.data?.data?.vouchers || []);
+
+        // Fetch payment methods from order ENUM
+        const paymentRes = await orderService.getPaymentMethods();
+        setPaymentMethods(paymentRes.data?.data || []);
       } catch (err) {
         console.error('Error fetching checkout data:', err);
       } finally {
@@ -77,37 +90,51 @@ const CheckoutPage = () => {
     }
   }, [isAuthenticated]);
 
-  // Payment methods
-  const paymentMethods = [
-    { id: 'COD', name: 'Cash on Delivery (COD)', icon: '💵' },
-    { id: 'Banking', name: 'Bank Transfer', icon: '🏦' },
-    { id: 'Momo', name: 'MoMo Wallet', icon: '📱' },
-    { id: 'ZaloPay', name: 'ZaloPay', icon: '💳' }
-  ];
+  // Calculate order preview from backend when shipping or voucher changes
+  useEffect(() => {
+    const fetchPreview = async () => {
+      if (!privateClient || !selectedShipping) return;
 
-  // Calculations
-  const subtotal = checkoutItems.reduce((sum, item) => sum + ((item.price_at_purchase || item.price) * item.quantity), 0);
-  const shippingFee = selectedShipping?.fee || 0;
-  
-  const calculateDiscount = () => {
-    if (!selectedVoucher) return 0;
-    if (subtotal < selectedVoucher.min_order_value) return 0;
-    
-    if (selectedVoucher.discount_type === 'Percentage') {
-      return Math.floor(subtotal * selectedVoucher.discount_value / 100);
-    } else {
-      return selectedVoucher.discount_value;
-    }
-  };
-  
-  const discount = calculateDiscount();
-  const totalAmount = subtotal + shippingFee - discount;
+      try {
+        const response = await orderService.calculateOrderPreview({
+          shipping_id: selectedShipping.shipping_id,
+          voucher_code: selectedVoucher?.code || null
+        }, privateClient);
 
+        if (response.data?.success) {
+          setOrderSummary(response.data.data);
+        }
+      } catch (err) {
+        console.error('Error calculating preview:', err);
+      }
+    };
+
+    fetchPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedShipping?.shipping_id, selectedVoucher?.code]);
+
+  // Format price helper
   const formatPrice = (price) => {
-    return (price || 0).toLocaleString('vi-VN') + 'đ';
+    return Math.floor(price || 0).toLocaleString('vi-VN') + ' VND';
   };
 
-  const handleApplyVoucher = () => {
+  // Use backend calculated values from orderSummary
+  const subtotal = orderSummary.subtotal || 0;
+
+  const handleApplyVoucher = (voucherParam) => {
+    // If called from dropdown with voucher object
+    if (voucherParam) {
+      if (subtotal < voucherParam.min_order_value) {
+        alert(`Minimum order ${formatPrice(voucherParam.min_order_value)} to use this voucher`);
+        return;
+      }
+      setSelectedVoucher(voucherParam);
+      setVoucherCode(voucherParam.code);
+      setShowVoucherDropdown(false);
+      return;
+    }
+    
+    // If called from Apply button with code input
     if (voucherCode.trim()) {
       const foundVoucher = vouchers.find(v => v.code.toLowerCase() === voucherCode.toLowerCase());
       
@@ -142,17 +169,15 @@ const CheckoutPage = () => {
       const response = await orderService.createOrder(orderData, privateClient);
       
       if (response.data?.success) {
-        navigate('/order-confirmation/' + response.data.data.order_id, {
+        // Get actual totals from backend response
+        const orderData = response.data.data;
+        navigate('/order/confirmation/' + orderData.order_id, {
           state: {
             order: {
-              ...response.data.data,
+              ...orderData,
               items: checkoutItems,
               shipping: selectedShipping,
-              voucher: selectedVoucher,
-              subtotal,
-              shipping_fee: shippingFee,
-              discount,
-              total_amount: totalAmount
+              voucher: selectedVoucher
             }
           }
         });
@@ -183,7 +208,7 @@ const CheckoutPage = () => {
   return (
     <div style={checkoutStyles.page}>
       <div style={checkoutStyles.container}>
-        <h1 style={checkoutStyles.pageTitle}>Thanh Toán</h1>
+        <h1 style={checkoutStyles.pageTitle}>Payment</h1>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px' }}>
           {/* Left Column */}
@@ -253,7 +278,7 @@ const CheckoutPage = () => {
               setVoucherCode={setVoucherCode}
               showVoucherDropdown={showVoucherDropdown}
               setShowVoucherDropdown={setShowVoucherDropdown}
-              availableVouchers={availableVouchers}
+              availableVouchers={vouchers}
               subtotal={subtotal}
               onApplyVoucher={handleApplyVoucher}
               onRemoveVoucher={() => {
@@ -267,10 +292,10 @@ const CheckoutPage = () => {
             {/* Order Summary */}
             <CheckoutSummary
               checkoutItems={checkoutItems}
-              subtotal={subtotal}
-              shippingFee={shippingFee}
-              discount={discount}
-              totalAmount={totalAmount}
+              subtotal={orderSummary.subtotal}
+              shippingFee={orderSummary.shipping_fee}
+              discount={orderSummary.discount_amount}
+              totalAmount={orderSummary.total_amount}
               selectedVoucher={selectedVoucher}
               onPlaceOrder={handlePlaceOrder}
               styles={checkoutStyles}

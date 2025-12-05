@@ -4,7 +4,7 @@ const CheckoutShippingSection = ({ shippingOptions, selectedShipping, onSelectSh
   return (
     <div style={styles.section}>
       <h2 style={styles.sectionTitle}>
-        <span>🚚</span> Phương Thức Vận Chuyển
+        <span>🚚</span> Shipping method
       </h2>
       {shippingOptions.filter(s => s.status === 'Active').map(option => (
         <div
@@ -25,7 +25,7 @@ const CheckoutShippingSection = ({ shippingOptions, selectedShipping, onSelectSh
           <div style={styles.shippingInfo}>
             <div style={styles.shippingName}>{option.name}</div>
             <div style={styles.shippingDays}>
-              Nhận hàng trong {option.estimated_days} ngày
+              Receive in {option.estimated_days} days
             </div>
           </div>
           <div style={styles.shippingFee}>{formatPrice(option.fee)}</div>

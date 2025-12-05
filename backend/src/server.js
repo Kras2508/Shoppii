@@ -3,6 +3,7 @@ import http from 'http'
 import cors from 'cors'
 import { Server } from 'socket.io'
 import { fileURLToPath } from 'url';
+import path from 'path';
 import dotenv from 'dotenv';
 import { testConnection } from './config/database.js';
 import routes from './routes/index.js';
@@ -11,14 +12,18 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Static files for uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // API Routes
 app.use('/api', routes);

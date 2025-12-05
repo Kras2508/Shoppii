@@ -15,12 +15,13 @@ export const getShopById = async (req, res) => {
         a.created_at,
         COUNT(DISTINCT p.product_id) as total_products,
         COALESCE(SUM(oi.quantity), 0) as total_sold,
-        COUNT(DISTINCT r.review_id) as total_reviews
+        COUNT(DISTINCT r.review_id) as total_reviews,
+        fn_calculate_shop_rating(s.shop_id) as calculated_rating
       FROM Shop s
-      INNER JOIN Account a ON s.account_id = a.account_id
+      INNER JOIN Account a ON s.shop_id = a.account_id
       LEFT JOIN Product p ON s.shop_id = p.shop_id
       LEFT JOIN ProductItem pi ON p.product_id = pi.product_id
-      LEFT JOIN OrderItem oi ON pi.item_id = oi.variantID
+      LEFT JOIN OrderItem oi ON pi.item_id = oi.item_id
       LEFT JOIN Review r ON s.shop_id = r.target_id AND r.target_type = 'Shop'
       WHERE s.shop_id = ?
       GROUP BY s.shop_id
@@ -74,7 +75,7 @@ export const getShops = async (req, res) => {
         a.created_at,
         COUNT(DISTINCT p.product_id) as total_products
       FROM Shop s
-      INNER JOIN Account a ON s.account_id = a.account_id
+      INNER JOIN Account a ON s.shop_id = a.account_id
       LEFT JOIN Product p ON s.shop_id = p.shop_id
       ${whereClause}
       GROUP BY s.shop_id
@@ -85,7 +86,7 @@ export const getShops = async (req, res) => {
     const [countResult] = await pool.query(`
       SELECT COUNT(DISTINCT s.shop_id) as total
       FROM Shop s
-      INNER JOIN Account a ON s.account_id = a.account_id
+      INNER JOIN Account a ON s.shop_id = a.account_id
       ${whereClause}
     `, params);
 
@@ -119,7 +120,7 @@ export const getShopDashboard = async (req, res) => {
 
     // Get shop_id
     const [shops] = await pool.query(
-      'SELECT shop_id FROM Shop WHERE account_id = ?',
+      'SELECT shop_id FROM Shop WHERE shop_id = ?',
       [accountId]
     );
 
@@ -141,7 +142,7 @@ export const getShopDashboard = async (req, res) => {
         a.phone,
         a.created_at
       FROM Shop s
-      INNER JOIN Account a ON s.account_id = a.account_id
+      INNER JOIN Account a ON s.shop_id = a.account_id
       WHERE s.shop_id = ?
     `, [shopId]);
 
@@ -158,10 +159,10 @@ export const getShopDashboard = async (req, res) => {
     const [orderStats] = await pool.query(`
       SELECT 
         COUNT(DISTINCT o.order_id) as total_orders,
-        SUM(CASE WHEN o.status = 'Processing' THEN 1 ELSE 0 END) as processing,
-        SUM(CASE WHEN o.status = 'Shipped' THEN 1 ELSE 0 END) as shipped,
-        SUM(CASE WHEN o.status = 'Delivered' THEN 1 ELSE 0 END) as delivered,
-        SUM(CASE WHEN o.status = 'Cancelled' THEN 1 ELSE 0 END) as cancelled
+        COUNT(DISTINCT CASE WHEN o.status = 'Processing' THEN o.order_id END) as processing,
+        COUNT(DISTINCT CASE WHEN o.status = 'Shipped' THEN o.order_id END) as shipped,
+        COUNT(DISTINCT CASE WHEN o.status = 'Delivered' THEN o.order_id END) as delivered,
+        COUNT(DISTINCT CASE WHEN o.status = 'Cancelled' THEN o.order_id END) as cancelled
       FROM \`Order\` o
       INNER JOIN OrderItem oi ON o.order_id = oi.order_id
       WHERE oi.shop_id = ?
@@ -173,22 +174,25 @@ export const getShopDashboard = async (req, res) => {
       [shopId]
     );
 
-    // Get recent orders
+    // Get recent orders - use fn_calculate_order_total function
     const [recentOrders] = await pool.query(`
-      SELECT DISTINCT
+      SELECT 
         o.order_id,
         o.status,
-        o.total_amount,
         o.created_at,
-        a.full_name as customer_name
+        a.full_name as customer_name,
+        fn_calculate_order_total(o.order_id) as total_amount
       FROM \`Order\` o
       INNER JOIN OrderItem oi ON o.order_id = oi.order_id
       INNER JOIN Customer c ON o.customer_id = c.customer_id
-      INNER JOIN Account a ON c.account_id = a.account_id
+      INNER JOIN Account a ON c.customer_id = a.account_id
       WHERE oi.shop_id = ?
+      GROUP BY o.order_id
       ORDER BY o.created_at DESC
       LIMIT 5
     `, [shopId]);
+
+    console.log('📦 Recent Orders from DB:', recentOrders);
 
     // Get top products
     const [topProducts] = await pool.query(`
@@ -200,7 +204,7 @@ export const getShopDashboard = async (req, res) => {
         SUM(oi.quantity * oi.price_at_purchase) as total_revenue
       FROM Product p
       INNER JOIN ProductItem pi ON p.product_id = pi.product_id
-      INNER JOIN OrderItem oi ON pi.item_id = oi.variantID
+      INNER JOIN OrderItem oi ON pi.item_id = oi.item_id
       INNER JOIN \`Order\` o ON oi.order_id = o.order_id
       WHERE p.shop_id = ? AND o.status != 'Cancelled'
       GROUP BY p.product_id
@@ -240,7 +244,7 @@ export const updateShopProfile = async (req, res) => {
 
     // Get shop_id
     const [shops] = await pool.query(
-      'SELECT shop_id FROM Shop WHERE account_id = ?',
+      'SELECT shop_id FROM Shop WHERE shop_id = ?',
       [accountId]
     );
 
@@ -317,7 +321,7 @@ export const getShopRevenueReport = async (req, res) => {
 
     // Get shop_id
     const [shops] = await pool.query(
-      'SELECT shop_id FROM Shop WHERE account_id = ?',
+      'SELECT shop_id FROM Shop WHERE shop_id = ?',
       [accountId]
     );
 
@@ -357,3 +361,4 @@ export const getShopRevenueReport = async (req, res) => {
     });
   }
 };
+

@@ -8,34 +8,13 @@ const ProfileEdit = ({ user, styles, onSave, onCancel }) => {
     phone: user.phone || '',
     add_phone: user.add_phone || '',
     address: user.address || '',
-    gender: user.gender || '',
-    birthday: user.birthday || ''
   });
-
-  const genderOptions = [
-    { value: '', label: 'Chọn giới tính' },
-    { value: 'male', label: 'Nam' },
-    { value: 'female', label: 'Nữ' },
-    { value: 'other', label: 'Khác' }
-  ];
-
-  const getGenderLabel = (value) => {
-    const option = genderOptions.find(opt => opt.value === value);
-    return option ? option.label : 'Chọn giới tính';
-  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
-    }));
-  };
-
-  const handleGenderSelect = (value) => {
-    setFormData(prev => ({
-      ...prev,
-      gender: value
     }));
   };
 
@@ -48,10 +27,10 @@ const ProfileEdit = ({ user, styles, onSave, onCancel }) => {
     <form onSubmit={handleSubmit}>
       {/* Basic Info */}
       <div style={styles.formSection}>
-        <h3 style={styles.formTitle}>📋 Thông tin cơ bản</h3>
+        <h3 style={styles.formTitle}>📋 General information</h3>
         <div style={styles.formGrid}>
           <div style={styles.formGroup}>
-            <label style={styles.formLabel}>Họ và tên *</label>
+            <label style={styles.formLabel}>Full name *</label>
             <input
               type="text"
               name="full_name"
@@ -73,7 +52,7 @@ const ProfileEdit = ({ user, styles, onSave, onCancel }) => {
             />
           </div>
           <div style={styles.formGroup}>
-            <label style={styles.formLabel}>Số điện thoại *</label>
+            <label style={styles.formLabel}>Phone number *</label>
             <input
               type="tel"
               name="phone"
@@ -84,71 +63,14 @@ const ProfileEdit = ({ user, styles, onSave, onCancel }) => {
             />
           </div>
           <div style={styles.formGroup}>
-            <label style={styles.formLabel}>Số điện thoại phụ</label>
+            <label style={styles.formLabel}>Secondary phone number</label>
             <input
               type="tel"
               name="add_phone"
               value={formData.add_phone}
               onChange={handleChange}
               style={styles.formInput}
-              placeholder="Số điện thoại dự phòng"
-            />
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.formLabel}>Giới tính</label>
-            <Dropdown
-              trigger={
-                <div style={{
-                  ...styles.formInput,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  color: formData.gender ? '#1F241F' : '#999'
-                }}>
-                  <span>{getGenderLabel(formData.gender)}</span>
-                  <span style={{ fontSize: '12px', color: '#999' }}>▼</span>
-                </div>
-              }
-              align="left"
-            >
-              <div style={{ minWidth: '200px' }}>
-                {genderOptions.map(option => (
-                  <div
-                    key={option.value}
-                    onClick={() => handleGenderSelect(option.value)}
-                    style={{
-                      padding: '12px 16px',
-                      cursor: 'pointer',
-                      backgroundColor: formData.gender === option.value ? '#647A67' : 'transparent',
-                      color: formData.gender === option.value ? '#fff' : '#1F241F',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (formData.gender !== option.value) {
-                        e.target.style.backgroundColor = '#f5f5f5';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (formData.gender !== option.value) {
-                        e.target.style.backgroundColor = 'transparent';
-                      }
-                    }}
-                  >
-                    {option.label}
-                  </div>
-                ))}
-              </div>
-            </Dropdown>
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.formLabel}>Ngày sinh</label>
-            <input
-              type="date"
-              name="birthday"
-              value={formData.birthday}
-              onChange={handleChange}
-              style={styles.formInput}
+              placeholder="Secondary phone number"
             />
           </div>
         </div>
@@ -156,16 +78,16 @@ const ProfileEdit = ({ user, styles, onSave, onCancel }) => {
 
       {/* Address */}
       <div style={styles.formSection}>
-        <h3 style={styles.formTitle}>📍 Địa chỉ giao hàng</h3>
+        <h3 style={styles.formTitle}>📍Shipping address</h3>
         <div style={styles.formGrid}>
           <div style={{ ...styles.formGroup, ...styles.formGroupFull }}>
-            <label style={styles.formLabel}>Địa chỉ đầy đủ *</label>
+            <label style={styles.formLabel}>Full address *</label>
             <textarea
               name="address"
               value={formData.address}
               onChange={handleChange}
               style={styles.formTextarea}
-              placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố"
+              placeholder="House number, street, ward/commune, district, city/province"
               required
             />
           </div>
@@ -174,22 +96,22 @@ const ProfileEdit = ({ user, styles, onSave, onCancel }) => {
 
       {/* Security */}
       <div style={styles.formSection}>
-        <h3 style={styles.formTitle}>🔒 Bảo mật</h3>
+        <h3 style={styles.formTitle}>🔒 Security</h3>
         <div style={styles.formGrid}>
           <div style={styles.formGroup}>
-            <label style={styles.formLabel}>Mật khẩu hiện tại</label>
+            <label style={styles.formLabel}>Current password</label>
             <input
               type="password"
               style={styles.formInput}
-              placeholder="Nhập để đổi mật khẩu"
+              placeholder="Enter to change password"
             />
           </div>
           <div style={styles.formGroup}>
-            <label style={styles.formLabel}>Mật khẩu mới</label>
+            <label style={styles.formLabel}>New password</label>
             <input
               type="password"
               style={styles.formInput}
-              placeholder="Mật khẩu mới"
+              placeholder="New password"
             />
           </div>
         </div>
@@ -201,7 +123,7 @@ const ProfileEdit = ({ user, styles, onSave, onCancel }) => {
           Hủy
         </button>
         <button type="submit" style={styles.saveBtn}>
-          💾 Lưu thay đổi
+          💾 Save changes
         </button>
       </div>
     </form>

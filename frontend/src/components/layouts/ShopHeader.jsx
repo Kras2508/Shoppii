@@ -11,9 +11,6 @@ const ShopHeader = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  // Mock pending orders count
-  const pendingOrdersCount = 5;
-
   const styles = {
     header: {
       backgroundColor: '#1F241F',
@@ -140,7 +137,6 @@ const ShopHeader = () => {
             <span>🏪</span>
             <span>ShopMart</span>
           </Link>
-          <span style={styles.shopBadge}>Kênh người bán</span>
         </div>
 
         {/* Navigation */}
@@ -169,7 +165,7 @@ const ShopHeader = () => {
               if (!currentPath.includes('/shop/products')) e.target.style.backgroundColor = 'transparent';
             }}
           >
-            📦 Sản phẩm
+            📦 Products
           </Link>
           <Link
             to="/shop/orders"
@@ -182,7 +178,7 @@ const ShopHeader = () => {
               if (!currentPath.includes('/shop/orders')) e.target.style.backgroundColor = 'transparent';
             }}
           >
-            🛒 Đơn hàng
+            🛒 Orders
           </Link>
           <Link
             to="/shop/reviews"
@@ -195,20 +191,7 @@ const ShopHeader = () => {
               if (!currentPath.includes('/shop/reviews')) e.target.style.backgroundColor = 'transparent';
             }}
           >
-            ⭐ Đánh giá
-          </Link>
-          <Link
-            to="/shop/reports"
-            style={{
-              ...styles.navLink,
-              ...(currentPath.includes('/shop/reports') ? styles.navLinkActive : {})
-            }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.1)'}
-            onMouseLeave={(e) => {
-              if (!currentPath.includes('/shop/reports')) e.target.style.backgroundColor = 'transparent';
-            }}
-          >
-            📈 Báo cáo
+            ⭐ Reviews
           </Link>
         </nav>
 
@@ -216,10 +199,7 @@ const ShopHeader = () => {
         <div style={styles.rightSection}>
           {/* Pending Orders */}
           <Link to="/shop/orders?status=pending" style={styles.pendingBadge}>
-            ⏳ Chờ xử lý
-            {pendingOrdersCount > 0 && (
-              <span style={styles.badgeCount}>{pendingOrdersCount}</span>
-            )}
+            ⏳ Pending
           </Link>
 
           {/* User Menu */}
@@ -283,7 +263,7 @@ const ShopHeader = () => {
                         setShowUserMenu(false);
                       }}
                     >
-                      ⚙️ Cài đặt Shop
+                      ⚙️ Shop Settings
                     </div>
                     <div
                       style={{
@@ -304,7 +284,7 @@ const ShopHeader = () => {
                         navigate('/');
                       }}
                     >
-                      🚪 Đăng xuất
+                      🚪 Sign out
                     </div>
                   </div>
                 </div>

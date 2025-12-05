@@ -15,7 +15,7 @@ export const getOrders = async (req, res) => {
     if (role === 'Customer') {
       // Get customer_id
       const [customers] = await pool.query(
-        'SELECT customer_id FROM Customer WHERE account_id = ?',
+        'SELECT customer_id FROM Customer WHERE customer_id = ?',
         [accountId]
       );
 
@@ -38,6 +38,7 @@ export const getOrders = async (req, res) => {
       query = `
         SELECT 
           o.*,
+          fn_calculate_order_total(o.order_id) as total_amount,
           sh.name as shipping_name,
           sh.fee as shipping_fee,
           v.discount_type,
@@ -55,7 +56,7 @@ export const getOrders = async (req, res) => {
     } else if (role === 'Shop') {
       // Get shop_id
       const [shops] = await pool.query(
-        'SELECT shop_id FROM Shop WHERE account_id = ?',
+        'SELECT shop_id FROM Shop WHERE shop_id = ?',
         [accountId]
       );
 
@@ -78,6 +79,7 @@ export const getOrders = async (req, res) => {
       query = `
         SELECT DISTINCT
           o.*,
+          fn_calculate_order_total(o.order_id) as total_amount,
           a.full_name as customer_name,
           a.phone as customer_phone,
           sh.name as shipping_name,
@@ -85,7 +87,7 @@ export const getOrders = async (req, res) => {
         FROM \`Order\` o
         INNER JOIN OrderItem oi ON o.order_id = oi.order_id
         INNER JOIN Customer c ON o.customer_id = c.customer_id
-        INNER JOIN Account a ON c.account_id = a.account_id
+        INNER JOIN Account a ON c.customer_id = a.account_id
         LEFT JOIN Shipping sh ON o.shipping_id = sh.shipping_id
         ${whereClause}
         ORDER BY o.created_at DESC
@@ -124,7 +126,7 @@ export const getOrders = async (req, res) => {
           s.shop_id,
           s.shop_name
         FROM OrderItem oi
-        INNER JOIN ProductItem pi ON oi.variantID = pi.item_id
+        INNER JOIN ProductItem pi ON oi.item_id = pi.item_id
         INNER JOIN Product p ON pi.product_id = p.product_id
         INNER JOIN Shop s ON oi.shop_id = s.shop_id
         WHERE oi.order_id = ?
@@ -133,7 +135,7 @@ export const getOrders = async (req, res) => {
       // If shop, only show their items
       if (role === 'Shop') {
         const [shops] = await pool.query(
-          'SELECT shop_id FROM Shop WHERE account_id = ?',
+          'SELECT shop_id FROM Shop WHERE shop_id = ?',
           [accountId]
         );
         itemQuery += ` AND oi.shop_id = ${shops[0].shop_id}`;
@@ -184,11 +186,13 @@ export const getOrderById = async (req, res) => {
         sh.name as shipping_name,
         sh.fee as shipping_fee,
         sh.estimated_days,
+        v.voucher_id,
+        v.code as voucher_code,
         v.discount_type,
         v.discount_value
       FROM \`Order\` o
       INNER JOIN Customer c ON o.customer_id = c.customer_id
-      INNER JOIN Account a ON c.account_id = a.account_id
+      INNER JOIN Account a ON c.customer_id = a.account_id
       LEFT JOIN Shipping sh ON o.shipping_id = sh.shipping_id
       LEFT JOIN Voucher v ON o.voucher_id = v.voucher_id
       WHERE o.order_id = ?
@@ -206,7 +210,7 @@ export const getOrderById = async (req, res) => {
     // Check access permission
     if (role === 'Customer') {
       const [customers] = await pool.query(
-        'SELECT customer_id FROM Customer WHERE account_id = ?',
+        'SELECT customer_id FROM Customer WHERE customer_id = ?',
         [accountId]
       );
       if (order.customer_id !== customers[0].customer_id) {
@@ -217,7 +221,7 @@ export const getOrderById = async (req, res) => {
       }
     } else if (role === 'Shop') {
       const [shops] = await pool.query(
-        'SELECT shop_id FROM Shop WHERE account_id = ?',
+        'SELECT shop_id FROM Shop WHERE shop_id = ?',
         [accountId]
       );
       const [shopItems] = await pool.query(
@@ -245,7 +249,7 @@ export const getOrderById = async (req, res) => {
         s.shop_id,
         s.shop_name
       FROM OrderItem oi
-      INNER JOIN ProductItem pi ON oi.variantID = pi.item_id
+      INNER JOIN ProductItem pi ON oi.item_id = pi.item_id
       INNER JOIN Product p ON pi.product_id = p.product_id
       INNER JOIN Shop s ON oi.shop_id = s.shop_id
       WHERE oi.order_id = ?
@@ -292,7 +296,7 @@ export const createOrder = async (req, res) => {
   
   try {
     const accountId = req.user.account_id;
-    const { shipping_id, voucher_id, shipping_address, payment_method } = req.body;
+    const { shipping_id, voucher_id, shipping_address, payment_method, note } = req.body;
 
     // Validate required fields
     if (!shipping_id || !shipping_address || !payment_method) {
@@ -304,7 +308,7 @@ export const createOrder = async (req, res) => {
 
     // Get customer_id
     const [customers] = await pool.query(
-      'SELECT customer_id FROM Customer WHERE account_id = ?',
+      'SELECT customer_id FROM Customer WHERE customer_id = ?',
       [accountId]
     );
 
@@ -317,27 +321,50 @@ export const createOrder = async (req, res) => {
 
     const customerId = customers[0].customer_id;
 
+    console.log('📦 Creating order with voucher_id:', voucher_id, 'customer:', customerId);
+
     // Call stored procedure to create order
     await connection.query(
-      'CALL sp_create_order_from_cart(?, ?, ?, ?, ?, @order_id)',
-      [customerId, shipping_id, voucher_id || null, shipping_address, payment_method]
+      'CALL sp_create_order_from_cart(?, ?, ?, ?, ?, ?, @order_id)',
+      [customerId, shipping_id, voucher_id || null, shipping_address, payment_method, note || null]
     );
 
     const [result] = await connection.query('SELECT @order_id as order_id');
     const orderId = result[0].order_id;
 
-    // Get created order
+    console.log('✅ Order created:', orderId);
+
+    // Get created order with all details
     const [orders] = await pool.query(`
-      SELECT o.*, sh.name as shipping_name, sh.fee as shipping_fee
+      SELECT 
+        o.*,
+        sh.name as shipping_name, 
+        sh.fee as shipping_fee,
+        v.voucher_id,
+        v.code as voucher_code,
+        v.discount_type,
+        v.discount_value
       FROM \`Order\` o
       LEFT JOIN Shipping sh ON o.shipping_id = sh.shipping_id
+      LEFT JOIN Voucher v ON o.voucher_id = v.voucher_id
       WHERE o.order_id = ?
     `, [orderId]);
+
+    console.log('📋 Order with voucher:', orders[0].voucher_id, orders[0].voucher_code);
+
+    // Get order items with function fn_calculate_order_total
+    const [totalResult] = await pool.query(
+      'SELECT fn_calculate_order_total(?) as subtotal',
+      [orderId]
+    );
 
     res.status(201).json({
       success: true,
       message: 'Order created successfully',
-      data: orders[0]
+      data: {
+        ...orders[0],
+        subtotal: totalResult[0].subtotal
+      }
     });
 
   } catch (error) {
@@ -372,7 +399,7 @@ export const updateOrderStatus = async (req, res) => {
     // Check access permission
     if (role === 'Shop') {
       const [shops] = await pool.query(
-        'SELECT shop_id FROM Shop WHERE account_id = ?',
+        'SELECT shop_id FROM Shop WHERE shop_id = ?',
         [accountId]
       );
       
@@ -428,7 +455,7 @@ export const cancelOrder = async (req, res) => {
 
     // Get customer_id
     const [customers] = await pool.query(
-      'SELECT customer_id FROM Customer WHERE account_id = ?',
+      'SELECT customer_id FROM Customer WHERE customer_id = ?',
       [accountId]
     );
 
@@ -458,14 +485,14 @@ export const cancelOrder = async (req, res) => {
 
     // Restore stock for each item
     const [orderItems] = await pool.query(
-      'SELECT variantID, quantity FROM OrderItem WHERE order_id = ?',
+      'SELECT item_id, quantity FROM OrderItem WHERE order_id = ?',
       [id]
     );
 
     for (const item of orderItems) {
       await connection.query(
         'UPDATE ProductItem SET stock = stock + ? WHERE item_id = ?',
-        [item.quantity, item.variantID]
+        [item.quantity, item.item_id]
       );
     }
 
@@ -500,3 +527,154 @@ export const cancelOrder = async (req, res) => {
     connection.release();
   }
 };
+
+// Get payment methods from Order table ENUM
+export const getPaymentMethods = async (req, res) => {
+  try {
+    const [columns] = await pool.query(`
+      SELECT COLUMN_TYPE 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = 'ecommerce_db' 
+      AND TABLE_NAME = 'Order' 
+      AND COLUMN_NAME = 'payment_method'
+    `);
+
+    if (columns.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment method column not found'
+      });
+    }
+
+    // Parse ENUM values: "enum('COD','Banking','Momo','ZaloPay')"
+    const enumString = columns[0].COLUMN_TYPE;
+    const paymentMethods = enumString
+      .match(/enum\((.*)\)/i)[1]
+      .split(',')
+      .map(val => val.replace(/'/g, '').trim());
+
+    res.json({
+      success: true,
+      data: paymentMethods
+    });
+
+  } catch (error) {
+    console.error('Get payment methods error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get payment methods',
+      error: error.message
+    });
+  }
+};
+
+// Calculate order preview (subtotal, discount, total) - uses sp_apply_voucher
+export const calculateOrderPreview = async (req, res) => {
+  try {
+    const accountId = req.user.account_id;
+    const { shipping_id, voucher_code } = req.body;
+
+    // Get customer_id
+    const [customers] = await pool.query(
+      'SELECT customer_id FROM Customer WHERE customer_id = ?',
+      [accountId]
+    );
+
+    if (customers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer not found'
+      });
+    }
+
+    const customerId = customers[0].customer_id;
+
+    // Get cart
+    const [carts] = await pool.query(
+      'SELECT cart_id FROM Cart WHERE customer_id = ?',
+      [customerId]
+    );
+
+    if (carts.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cart not found'
+      });
+    }
+
+    const cartId = carts[0].cart_id;
+
+    // Calculate subtotal from cart
+    const [subtotalResult] = await pool.query(`
+      SELECT COALESCE(SUM(ci.quantity * pi.price), 0) as subtotal
+      FROM CartItem ci
+      INNER JOIN ProductItem pi ON ci.item_id = pi.item_id
+      WHERE ci.cart_id = ?
+    `, [cartId]);
+
+    const subtotal = parseFloat(subtotalResult[0].subtotal) || 0;
+
+    // Get shipping fee
+    let shippingFee = 0;
+    if (shipping_id) {
+      const [shipping] = await pool.query(
+        'SELECT fee FROM Shipping WHERE shipping_id = ? AND status = "Active"',
+        [shipping_id]
+      );
+      if (shipping.length > 0) {
+        shippingFee = parseFloat(shipping[0].fee) || 0;
+      }
+    }
+
+    // Calculate discount using sp_apply_voucher
+    let discountAmount = 0;
+    let voucherValid = false;
+    let voucherMessage = '';
+
+    if (voucher_code) {
+      const [result] = await pool.query(
+        'CALL sp_apply_voucher(?, ?, @discount, @valid, @message)',
+        [voucher_code, subtotal]
+      );
+      
+      const [output] = await pool.query(
+        'SELECT @discount as discount_amount, @valid as is_valid, @message as message'
+      );
+
+      discountAmount = parseFloat(output[0].discount_amount) || 0;
+      voucherValid = output[0].is_valid === 1;
+      voucherMessage = output[0].message;
+    }
+
+    const totalAmount = subtotal + shippingFee - discountAmount;
+
+    console.log('Order preview calculation:', {
+      subtotal,
+      shippingFee,
+      discountAmount,
+      totalAmount,
+      cartId
+    });
+
+    res.json({
+      success: true,
+      data: {
+        subtotal,
+        shipping_fee: shippingFee,
+        discount_amount: discountAmount,
+        total_amount: totalAmount,
+        voucher_valid: voucherValid,
+        voucher_message: voucherMessage
+      }
+    });
+
+  } catch (error) {
+    console.error('Calculate order preview error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to calculate order preview',
+      error: error.message
+    });
+  }
+};
+

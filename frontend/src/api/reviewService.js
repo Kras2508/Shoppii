@@ -17,9 +17,9 @@ export const reviewService = {
     return publicClient.get(`/reviews/${id}`)
   },
 
-  // Get shop reviews
-  getShopReviews: (shopId, params) => {
-    return publicClient.get(`/reviews/${shopId}/shop-reviews`, { params })
+  // Get shop reviews (authenticated shop owner)
+  getShopReviews: (privateClient, params) => {
+    return privateClient.get('/reviews/shop/reviews', { params })
   },
 
   // Create review

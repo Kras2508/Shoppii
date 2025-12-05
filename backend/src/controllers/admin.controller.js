@@ -224,7 +224,7 @@ export const getAllShops = async (req, res) => {
         COUNT(DISTINCT oi.order_id) as total_orders,
         fn_get_shop_revenue(s.shop_id) as total_revenue
       FROM Shop s
-      INNER JOIN Account a ON s.account_id = a.account_id
+      INNER JOIN Account a ON s.shop_id = a.account_id
       LEFT JOIN Product p ON s.shop_id = p.shop_id
       LEFT JOIN OrderItem oi ON s.shop_id = oi.shop_id
       ${whereClause}
@@ -236,7 +236,7 @@ export const getAllShops = async (req, res) => {
     const [countResult] = await pool.query(`
       SELECT COUNT(*) as total 
       FROM Shop s
-      INNER JOIN Account a ON s.account_id = a.account_id
+      INNER JOIN Account a ON s.shop_id = a.account_id
       ${whereClause}
     `, params);
 
@@ -301,7 +301,7 @@ export const getAllOrders = async (req, res) => {
         sh.fee as shipping_fee
       FROM \`Order\` o
       INNER JOIN Customer c ON o.customer_id = c.customer_id
-      INNER JOIN Account a ON c.account_id = a.account_id
+      INNER JOIN Account a ON c.customer_id = a.account_id
       LEFT JOIN OrderItem oi ON o.order_id = oi.order_id
       LEFT JOIN Shipping sh ON o.shipping_id = sh.shipping_id
       ${whereClause}
@@ -325,7 +325,7 @@ export const getAllOrders = async (req, res) => {
       SELECT COUNT(DISTINCT o.order_id) as total 
       FROM \`Order\` o
       INNER JOIN Customer c ON o.customer_id = c.customer_id
-      INNER JOIN Account a ON c.account_id = a.account_id
+      INNER JOIN Account a ON c.customer_id = a.account_id
       LEFT JOIN OrderItem oi ON o.order_id = oi.order_id
       ${whereClause}
     `, params);
@@ -437,7 +437,7 @@ export const getAllProducts = async (req, res) => {
       INNER JOIN Shop s ON p.shop_id = s.shop_id
       INNER JOIN Category c ON p.category_id = c.category_id
       LEFT JOIN ProductItem pi ON p.product_id = pi.product_id
-      LEFT JOIN OrderItem oi ON pi.item_id = oi.variantID
+      LEFT JOIN OrderItem oi ON pi.item_id = oi.item_id
       LEFT JOIN Review r ON p.product_id = r.target_id AND r.target_type = 'Product'
       ${whereClause}
       GROUP BY p.product_id
@@ -566,7 +566,7 @@ export const getAllReviews = async (req, res) => {
         END as target_name
       FROM Review r
       INNER JOIN Customer c ON r.customer_id = c.customer_id
-      INNER JOIN Account a ON c.account_id = a.account_id
+      INNER JOIN Account a ON c.customer_id = a.account_id
       LEFT JOIN Product p ON r.target_type = 'Product' AND r.target_id = p.product_id
       LEFT JOIN Shop s ON r.target_type = 'Shop' AND r.target_id = s.shop_id
       ${whereClause}
@@ -578,7 +578,7 @@ export const getAllReviews = async (req, res) => {
       SELECT COUNT(*) as total 
       FROM Review r
       INNER JOIN Customer c ON r.customer_id = c.customer_id
-      INNER JOIN Account a ON c.account_id = a.account_id
+      INNER JOIN Account a ON c.customer_id = a.account_id
       ${whereClause}
     `, params);
 
@@ -703,7 +703,7 @@ export const getDashboardStats = async (req, res) => {
         a.full_name as customer_name
       FROM \`Order\` o
       INNER JOIN Customer c ON o.customer_id = c.customer_id
-      INNER JOIN Account a ON c.account_id = a.account_id
+      INNER JOIN Account a ON c.customer_id = a.account_id
       ORDER BY o.created_at DESC
       LIMIT 10
     `);
@@ -752,3 +752,5 @@ export const getDashboardStats = async (req, res) => {
     });
   }
 };
+
+

@@ -50,11 +50,12 @@ const ShopProductsPage = () => {
         }
         
         if (categoriesRes.data?.data) {
-          setCategories(['Tất cả', ...categoriesRes.data.data.map(c => c.category_name)]);
+          const categoryList = categoriesRes.data.data.flat || categoriesRes.data.data.categories || [];
+          setCategories(['All', ...categoryList.map(c => c.category_name)]);
         }
       } catch (err) {
         console.error('Error fetching products:', err);
-        setError('Không thể tải danh sách sản phẩm');
+        setError('Cannot load products');
       } finally {
         setLoading(false);
       }
@@ -107,7 +108,7 @@ const ShopProductsPage = () => {
         setProductToDelete(null);
       } catch (err) {
         console.error('Error deleting product:', err);
-        alert('Không thể xóa sản phẩm. Vui lòng thử lại!');
+        alert('Cannot delete product. Please try again later.');
       }
     }
   };
@@ -117,7 +118,7 @@ const ShopProductsPage = () => {
       <div style={shopStyles.page}>
         <div style={{ textAlign: 'center', padding: '60px' }}>
           <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
-          <p>Đang tải danh sách sản phẩm...</p>
+          <p>Loading product list...</p>
         </div>
       </div>
     );
@@ -145,14 +146,14 @@ const ShopProductsPage = () => {
         {/* Header */}
         <div style={shopStyles.pageHeader}>
           <div>
-            <h1 style={shopStyles.pageTitle}>📦 Quản lý sản phẩm</h1>
+            <h1 style={shopStyles.pageTitle}>📦 Manage Products</h1>
             <p style={{ color: '#666', marginTop: '4px' }}>
-              {products.length} sản phẩm
+              {products.length} products
             </p>
           </div>
           <Link to="/shop/products/new" style={{ textDecoration: 'none' }}>
             <button style={shopStyles.primaryBtn}>
-              ➕ Thêm sản phẩm mới
+              ➕ Add New Product
             </button>
           </Link>
         </div>
@@ -162,7 +163,7 @@ const ShopProductsPage = () => {
           <div style={shopStyles.filterRow}>
             <input
               type="text"
-              placeholder="🔍 Tìm kiếm sản phẩm..."
+              placeholder="🔍 Search products..."
               style={shopStyles.searchInput}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -172,17 +173,17 @@ const ShopProductsPage = () => {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="Active">Đang bán</option>
-              <option value="Inactive">Ngừng bán</option>
-              <option value="Out of Stock">Hết hàng</option>
+              <option value="all">All statuses</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Out of Stock">Out of Stock</option>
             </select>
             <select
               style={shopStyles.filterSelect}
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
             >
-              <option value="all">Tất cả danh mục</option>
+              <option value="all">All categories</option>
               {categories.slice(1).map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
@@ -195,10 +196,10 @@ const ShopProductsPage = () => {
           {filteredProducts.length === 0 ? (
             <div style={shopStyles.emptyState}>
               <div style={shopStyles.emptyIcon}>📦</div>
-              <p style={shopStyles.emptyText}>Không tìm thấy sản phẩm nào</p>
+              <p style={shopStyles.emptyText}>No products found</p>
               <Link to="/shop/products/new" style={{ textDecoration: 'none' }}>
                 <button style={shopStyles.primaryBtn}>
-                  ➕ Thêm sản phẩm đầu tiên
+                  Add new product
                 </button>
               </Link>
             </div>
@@ -206,12 +207,12 @@ const ShopProductsPage = () => {
             <table style={shopStyles.table}>
               <thead style={shopStyles.tableHeader}>
                 <tr>
-                  <th style={shopStyles.th}>Sản phẩm</th>
-                  <th style={shopStyles.th}>Giá</th>
-                  <th style={shopStyles.th}>Kho</th>
-                  <th style={shopStyles.th}>Đã bán</th>
-                  <th style={shopStyles.th}>Trạng thái</th>
-                  <th style={shopStyles.th}>Thao tác</th>
+                  <th style={shopStyles.th}>Product</th>
+                  <th style={shopStyles.th}>Price</th>
+                  <th style={shopStyles.th}>Stock</th>
+                  <th style={shopStyles.th}>Sold</th>
+                  <th style={shopStyles.th}>Status</th>
+                  <th style={shopStyles.th}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -248,33 +249,38 @@ const ShopProductsPage = () => {
                       </span>
                     </td>
                     <td style={shopStyles.td}>
-                      <div style={shopStyles.actions}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
                         <button
-                          style={shopStyles.iconBtn}
-                          title="Xem"
-                          onClick={() => navigate(`/product/${product.product_id}`)}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#f0f0f0'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            backgroundColor: '#f39c12',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onClick={() => navigate(`/shop/products/${product.product_id}/edit`)}
+                          title="Edit product"
                         >
-                          👁️
+                          Edit
                         </button>
                         <button
-                          style={shopStyles.iconBtn}
-                          title="Sửa"
-                          onClick={() => navigate(`/shop/products/edit/${product.product_id}`)}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#f0fff0'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          style={{ ...shopStyles.iconBtn, borderColor: '#ffcccc' }}
-                          title="Xóa"
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            backgroundColor: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
                           onClick={() => handleDeleteClick(product)}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#fff0f0'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                          title="Delete product"
                         >
-                          🗑️
+                          Delete
                         </button>
                       </div>
                     </td>
@@ -288,7 +294,7 @@ const ShopProductsPage = () => {
         {/* Back to Dashboard */}
         <div style={{ marginTop: '20px' }}>
           <Link to="/shop" style={{ color: '#647A67', textDecoration: 'none' }}>
-            ← Quay lại Dashboard
+            ← Back to Dashboard
           </Link>
         </div>
       </div>
@@ -297,24 +303,24 @@ const ShopProductsPage = () => {
       {showDeleteModal && (
         <div style={shopStyles.modalOverlay} onClick={() => setShowDeleteModal(false)}>
           <div style={shopStyles.modalContent} onClick={e => e.stopPropagation()}>
-            <h3 style={shopStyles.modalTitle}>🗑️ Xác nhận xóa sản phẩm</h3>
+            <h3 style={shopStyles.modalTitle}> Confirm Deletion</h3>
             <p style={{ color: '#666', lineHeight: '1.6' }}>
-              Bạn có chắc chắn muốn xóa sản phẩm <strong>"{productToDelete?.product_name}"</strong>?
+              Are you sure you want to delete the product <strong>"{productToDelete?.product_name}"</strong>?
               <br />
-              Hành động này không thể hoàn tác.
+              This action cannot be undone.
             </p>
             <div style={shopStyles.modalActions}>
               <button
                 style={shopStyles.secondaryBtn}
                 onClick={() => setShowDeleteModal(false)}
               >
-                Hủy
+                Cancel
               </button>
               <button
                 style={shopStyles.dangerBtn}
                 onClick={handleDeleteConfirm}
               >
-                Xóa sản phẩm
+                Delete Product
               </button>
             </div>
           </div>

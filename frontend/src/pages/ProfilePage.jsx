@@ -6,11 +6,13 @@ import {
   ProfileStats,
   ProfileOrders,
   ProfileStatistics,
+  ProfileReviews,
   ProfileEdit,
   profileStyles
 } from './profile';
 import { authService } from '../api/authService.js';
 import { orderService } from '../api/orderService.js';
+import { customerService } from '../api/customerService.js';
 import createPrivateClient from '../clients/private.client.js';
 
 const ProfilePage = () => {
@@ -24,6 +26,7 @@ const ProfilePage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Redirect if not authenticated
@@ -33,20 +36,22 @@ const ProfilePage = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Fetch profile and orders data
+  // Fetch profile, orders and statistics data
   useEffect(() => {
     const fetchData = async () => {
       if (!isAuthenticated || !privateClient) return;
 
       try {
         setLoading(true);
-        const [profileRes, ordersRes] = await Promise.all([
+        const [profileRes, ordersRes, statsRes] = await Promise.all([
           authService.getProfile(privateClient),
-          orderService.getOrders(privateClient, { limit: 50 })
+          orderService.getOrders(privateClient, { limit: 50 }),
+          customerService.getStatistics(privateClient)
         ]);
 
         setProfileData(profileRes.data?.data);
         setOrders(ordersRes.data?.data?.orders || []);
+        setStatistics(statsRes.data?.data || null);
       } catch (err) {
         console.error('Error fetching profile data:', err);
       } finally {
@@ -60,7 +65,7 @@ const ProfilePage = () => {
   if (loading) {
     return (
       <div style={{ ...profileStyles.page, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <h2>Đang tải thông tin...</h2>
+        <h2>Loading...</h2>
       </div>
     );
   }
@@ -68,7 +73,7 @@ const ProfilePage = () => {
   if (!profileData) {
     return (
       <div style={{ ...profileStyles.page, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <h2>Không thể tải thông tin profile</h2>
+        <h2>Cannot load profile information</h2>
       </div>
     );
   }
@@ -79,35 +84,37 @@ const ProfilePage = () => {
     return order.status.toLowerCase() === orderFilter.toLowerCase();
   });
 
-  // Calculate stats from real data
+  // Use statistics from API (Part 2 functions) or fallback to calculated
   const stats = {
-    total_order: orders.length,
-    total_spent: profileData.total_spent || orders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0),
-    delivered_orders: orders.filter(o => o.status === 'Delivered').length,
+    total_order: statistics?.total_orders || orders.length,
+    total_spent: statistics?.total_spent || profileData.total_spent || 0,
+    delivered_orders: statistics?.delivered_count || orders.filter(o => o.status === 'Delivered').length,
+    total_reviews: statistics?.review_count || 0
   };
 
   const tabs = [
-    { key: 'orders', label: '📦 Đơn mua', count: orders.length },
-    { key: 'statistics', label: '📊 Thống kê' },
-    { key: 'reviews', label: '⭐ Đánh giá' },
-    { key: 'settings', label: '⚙️ Cài đặt' }
+    { key: 'orders', label: '📦 Orders', count: orders.length },
+    { key: 'statistics', label: '📊 Statistics' },
+    { key: 'reviews', label: '⭐ Reviews', count: statistics?.review_count },
+    { key: 'settings', label: '⚙️ Settings' }
   ];
 
   const formatPrice = (price) => {
-    return price?.toLocaleString('vi-VN') + 'đ';
+    const value = Number(price ?? 0);
+    return Math.floor(value).toLocaleString('vi-VN') + ' VND';
   };
 
   const handleSaveProfile = async (formData) => {
     try {
       await authService.updateProfile(formData, privateClient);
-      alert('Đã lưu thông tin!');
+      alert('Profile updated successfully!');
       setIsEditing(false);
       // Refresh profile data
       const profileRes = await authService.getProfile(privateClient);
       setProfileData(profileRes.data?.data);
     } catch (err) {
       console.error('Error updating profile:', err);
-      alert('Lỗi khi cập nhật thông tin');
+      alert('Error updating profile information');
     }
   };
 
@@ -168,7 +175,7 @@ const ProfilePage = () => {
         <div style={profileStyles.tabContent}>
           {activeTab === 'orders' && !isEditing && (
             <ProfileOrders
-              orders={filteredOrders}
+              orders={orders}
               filter={orderFilter}
               setFilter={setOrderFilter}
               styles={profileStyles}
@@ -179,9 +186,17 @@ const ProfilePage = () => {
           {activeTab === 'statistics' && !isEditing && (
             <ProfileStatistics
               stats={stats}
+              statistics={statistics}
               orders={orders}
               styles={profileStyles}
               formatPrice={formatPrice}
+            />
+          )}
+
+          {activeTab === 'reviews' && !isEditing && (
+            <ProfileReviews
+              styles={profileStyles}
+              privateClient={privateClient}
             />
           )}
 

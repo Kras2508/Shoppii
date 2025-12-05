@@ -160,7 +160,7 @@ const AdminHeader = () => {
             </DropdownItem>
             <DropdownDivider />
             <DropdownItem icon="🚪" danger onClick={handleLogout}>
-              Đăng xuất
+              Sign out
             </DropdownItem>
           </Dropdown>
         </div>

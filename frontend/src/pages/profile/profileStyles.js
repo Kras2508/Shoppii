@@ -151,7 +151,9 @@ const profileStyles = {
   },
   filterBtn: {
     padding: '8px 16px',
-    border: '1px solid #ddd',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: '#ddd',
     borderRadius: '20px',
     backgroundColor: '#fff',
     cursor: 'pointer',

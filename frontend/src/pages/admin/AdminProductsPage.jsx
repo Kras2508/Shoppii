@@ -1,73 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import adminStyles from './adminStyles.js';
+import { adminService } from '../../api/adminService.js';
 import Modal from '../../components/common/Modal';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
+import createPrivateClient from '../../clients/private.client';
 
 const AdminProductsPage = () => {
+  const { token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data
-  const [products, setProducts] = useState([
-    { 
-      id: 1, product_id: 'PRD001', name: 'Áo thun nam basic', shop_name: 'Fashion House',
-      category: 'Thời trang', price: 299000, stock: 150, sold: 1245, status: 'Active',
-      image: 'https://via.placeholder.com/80', created_at: '2024-01-15', rating: 4.8
-    },
-    { 
-      id: 2, product_id: 'PRD002', name: 'iPhone 15 Pro Max 256GB', shop_name: 'Tech World',
-      category: 'Điện tử', price: 34990000, stock: 25, sold: 89, status: 'Active',
-      image: 'https://via.placeholder.com/80', created_at: '2024-01-20', rating: 4.9
-    },
-    { 
-      id: 3, product_id: 'PRD003', name: 'Son môi MAC Ruby Woo', shop_name: 'Beauty Corner',
-      category: 'Mỹ phẩm', price: 650000, stock: 80, sold: 567, status: 'Active',
-      image: 'https://via.placeholder.com/80', created_at: '2024-02-10', rating: 4.7
-    },
-    { 
-      id: 4, product_id: 'PRD004', name: 'Giày Nike Air Max', shop_name: 'Sports Zone',
-      category: 'Thể thao', price: 2890000, stock: 45, sold: 234, status: 'Active',
-      image: 'https://via.placeholder.com/80', created_at: '2024-02-15', rating: 4.6
-    },
-    { 
-      id: 5, product_id: 'PRD005', name: 'Bàn làm việc gỗ', shop_name: 'Home & Living',
-      category: 'Nội thất', price: 1990000, stock: 20, sold: 78, status: 'Active',
-      image: 'https://via.placeholder.com/80', created_at: '2024-03-01', rating: 4.5
-    },
-    { 
-      id: 6, product_id: 'PRD006', name: 'iPhone 15 Pro Fake', shop_name: 'Gadget Zone',
-      category: 'Điện tử', price: 5990000, stock: 0, sold: 12, status: 'Banned',
-      image: 'https://via.placeholder.com/80', created_at: '2024-03-15', rating: 2.1,
-      ban_reason: 'Sản phẩm giả mạo, vi phạm chính sách'
-    },
-    { 
-      id: 7, product_id: 'PRD007', name: 'Túi xách nữ Gucci', shop_name: 'Fashion House',
-      category: 'Thời trang', price: 890000, stock: 35, sold: 456, status: 'Reported',
-      image: 'https://via.placeholder.com/80', created_at: '2024-03-20', rating: 4.4,
-      report_count: 5, report_reason: 'Nghi ngờ hàng nhái'
-    },
-    { 
-      id: 8, product_id: 'PRD008', name: 'Tai nghe Sony WH-1000XM5', shop_name: 'Tech World',
-      category: 'Điện tử', price: 8990000, stock: 15, sold: 123, status: 'Active',
-      image: 'https://via.placeholder.com/80', created_at: '2024-04-01', rating: 4.9
-    },
-    { 
-      id: 9, product_id: 'PRD009', name: 'Kem chống nắng Anessa', shop_name: 'Beauty Corner',
-      category: 'Mỹ phẩm', price: 450000, stock: 100, sold: 890, status: 'Active',
-      image: 'https://via.placeholder.com/80', created_at: '2024-04-05', rating: 4.8
-    },
-    { 
-      id: 10, product_id: 'PRD010', name: 'Thuốc lá điện tử', shop_name: 'Unknown Shop',
-      category: 'Khác', price: 990000, stock: 50, sold: 23, status: 'Banned',
-      image: 'https://via.placeholder.com/80', created_at: '2024-04-10', rating: 0,
-      ban_reason: 'Sản phẩm cấm bán'
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await adminService.getAllProducts(privateClient, {
+          search: searchTerm || undefined
+        });
+        if (response.data?.data?.products) {
+          setProducts(response.data.data.products);
+        }
+      } catch (err) {
+        console.error('Error fetching products:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchProducts();
     }
-  ]);
+  }, [token, searchTerm]);
 
   const categories = ['Thời trang', 'Điện tử', 'Mỹ phẩm', 'Thể thao', 'Nội thất', 'Khác'];
 

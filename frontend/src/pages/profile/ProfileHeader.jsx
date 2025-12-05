@@ -13,12 +13,12 @@ const ProfileHeader = ({ user, styles, onEditProfile }) => {
     <div style={styles.profileHeader}>
       <div style={styles.avatarSection}>
         <img
-          src={user.avatar || 'https://via.placeholder.com/120?text=Avatar'}
+          src={user.avatar || 'https://i.pinimg.com/1200x/f9/53/c9/f953c93a8bc71461c34beaddf96a5afd.jpg'}
           alt={user.full_name}
           style={styles.avatar}
         />
         <button style={styles.changeAvatarBtn}>
-          📷 Đổi ảnh
+          📷 Change avatar
         </button>
       </div>
 
@@ -38,12 +38,12 @@ const ProfileHeader = ({ user, styles, onEditProfile }) => {
         </div>
 
         <p style={styles.memberSince}>
-          🎂 Thành viên từ: {formatDate(user.created_at)}
+          🎂 Member since: {formatDate(user.created_at)}
         </p>
 
         <div style={{ marginTop: '16px' }}>
           <button style={styles.editProfileBtn} onClick={onEditProfile}>
-            ✏️ Chỉnh sửa hồ sơ
+            ✏️ Edit Profile
           </button>
         </div>
       </div>

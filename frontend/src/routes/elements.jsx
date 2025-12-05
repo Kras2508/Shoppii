@@ -12,7 +12,7 @@ import OrderConfirmationPage from '../pages/OrderConfirmationPage'
 import OrderDetailPage from '../pages/OrderDetailPage'
 import ProfilePage from '../pages/ProfilePage'
 import ReviewPage from '../pages/ReviewPage'
-import { ShopDashboardPage, ShopProductsPage, ProductFormPage, ShopSettingsPage, ShopReportsPage, ShopReviewsPage, ShopOrdersPage } from '../pages/shop'
+import { ShopDashboardPage, ShopProductsPage, ProductFormPage, ShopSettingsPage, ShopReviewsPage, ShopOrdersPage } from '../pages/shop'
 import { AdminLayout, AdminDashboard, AdminUsersPage, AdminShopsPage, AdminProductsPage, AdminOrdersPage, AdminReviewsPage } from '../pages/admin'
 
 const useRouterElements = () => {
@@ -75,16 +75,16 @@ const useRouterElements = () => {
       element: <ShopLayout><ProductFormPage /></ShopLayout>
     },
     {
-      path: '/shop/products/edit/:productId',
+      path: '/shop/products/:productId/edit',
+      element: <ShopLayout><ProductFormPage /></ShopLayout>
+    },
+    {
+      path: '/shop/products/:productId',
       element: <ShopLayout><ProductFormPage /></ShopLayout>
     },
     {
       path: '/shop/settings',
       element: <ShopLayout><ShopSettingsPage /></ShopLayout>
-    },
-    {
-      path: '/shop/reports',
-      element: <ShopLayout><ShopReportsPage /></ShopLayout>
     },
     {
       path: '/shop/reviews',

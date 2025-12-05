@@ -154,24 +154,11 @@ const FilterSidebar = ({
   return (
     <aside style={styles.sidebar}>
       <h2 style={styles.filterTitle}>
-        <span>☰</span> Bộ Lọc
+        <span>☰</span> Filter
       </h2>
-
-      {/* Search */}
-      <div style={styles.filterSection}>
-        <div style={styles.filterLabel}>Tìm Kiếm</div>
-        <input
-          type="text"
-          placeholder="Tìm sản phẩm..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={styles.searchInput}
-        />
-      </div>
-
       {/* Category */}
       <div style={styles.filterSection}>
-        <div style={styles.filterLabel}>Danh Mục</div>
+        <div style={styles.filterLabel}>Category</div>
         <div style={styles.categoryList}>
           {categories.map(cat => (
             <label key={cat.category_id} style={styles.categoryItem}>
@@ -189,7 +176,7 @@ const FilterSidebar = ({
 
       {/* Rating */}
       <div style={styles.filterSection}>
-        <div style={styles.filterLabel}>Đánh Giá</div>
+        <div style={styles.filterLabel}>Review</div>
         <div style={styles.ratingFilter}>
           {[5, 4, 3, 2, 1].map(rating => (
             <div
@@ -203,7 +190,7 @@ const FilterSidebar = ({
               <span style={styles.stars}>
                 {'★'.repeat(rating)}{'☆'.repeat(5 - rating)}
               </span>
-              <span style={{ fontSize: '13px', color: '#758173' }}>trở lên</span>
+              <span style={{ fontSize: '13px', color: '#758173' }}>and up</span>
             </div>
           ))}
         </div>
@@ -211,11 +198,11 @@ const FilterSidebar = ({
 
       {/* Price Range */}
       <div style={styles.filterSection}>
-        <div style={styles.filterLabel}>Khoảng Giá</div>
+        <div style={styles.filterLabel}>Price Range</div>
         <div style={styles.priceInputs}>
           <input
             type="number"
-            placeholder="Từ"
+            placeholder="From"
             value={priceRange.min}
             onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
             style={styles.priceInput}
@@ -223,37 +210,11 @@ const FilterSidebar = ({
           <span style={{ color: '#999' }}>—</span>
           <input
             type="number"
-            placeholder="Đến"
+            placeholder="To"
             value={priceRange.max}
             onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
             style={styles.priceInput}
           />
-        </div>
-      </div>
-
-      {/* Sort By */}
-      <div style={styles.filterSection}>
-        <div style={styles.filterLabel}>Sắp Xếp Theo</div>
-        <div style={styles.sortOptions}>
-          {sortOptions.map(option => (
-            <div
-              key={option.value}
-              style={{
-                ...styles.sortOption,
-                ...(sortBy === option.value ? styles.sortOptionActive : {})
-              }}
-              onClick={() => setSortBy(option.value)}
-            >
-              <span style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: sortBy === option.value ? '#647A67' : 'transparent',
-                border: '1px solid #647A67'
-              }} />
-              {option.label}
-            </div>
-          ))}
         </div>
       </div>
 
@@ -270,7 +231,7 @@ const FilterSidebar = ({
           e.target.style.color = '#647A67';
         }}
       >
-        Xóa Bộ Lọc
+        Clear Filters
       </button>
     </aside>
   );

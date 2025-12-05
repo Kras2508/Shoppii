@@ -22,16 +22,16 @@ const OrderItems = ({ order, styles, formatPrice }) => {
 
   return (
     <div style={styles.itemsSection}>
-      <h3 style={styles.itemsTitle}>Sản Phẩm Đã Đặt</h3>
+      <h3 style={styles.itemsTitle}>Ordered Products</h3>
       
-      {Object.values(groupedByShop).map(shop => (
-        <div key={shop.shop_id} style={styles.shopGroup}>
+      {Object.values(groupedByShop).map((shop, shopIndex) => (
+        <div key={shop.shop_id || `shop-${shopIndex}`} style={styles.shopGroup}>
           <div style={styles.shopHeader}>
-            <span>🏪</span> {shop.shop_name}
+            <span>🏪 {shop.shop_name}</span>
           </div>
           
-          {shop.items.map(item => (
-            <div key={item.order_item_id} style={styles.productItem}>
+          {shop.items.map((item, itemIndex) => (
+            <div key={item.order_item_id || item.item_id || `item-${shopIndex}-${itemIndex}`} style={styles.productItem}>
               <img
                 src={item.image_url}
                 alt={item.product_name}
@@ -49,14 +49,14 @@ const OrderItems = ({ order, styles, formatPrice }) => {
                 </div>
                 <div style={styles.productPriceRow}>
                   {item.price_at_purchase && item.price_at_purchase < item.price ? (
-                    <>
+                    <React.Fragment key={`price-${item.order_item_id}`}>
                       <span style={{ ...styles.productPrice, textDecoration: 'line-through', color: '#999', marginRight: '8px' }}>
                         {formatPrice(item.price)}
                       </span>
                       <span style={{ ...styles.productPrice, color: '#e53935' }}>
                         {formatPrice(item.price_at_purchase)}
                       </span>
-                    </>
+                    </React.Fragment>
                   ) : (
                     <span style={styles.productPrice}>
                       {formatPrice(getItemPrice(item))}
@@ -66,7 +66,7 @@ const OrderItems = ({ order, styles, formatPrice }) => {
                 </div>
               </div>
               <div style={styles.productTotal}>
-                {formatPrice(getItemPrice(item) * item.quantity)}
+                {formatPrice(item.total_price || getItemPrice(item) * item.quantity)}
               </div>
             </div>
           ))}
@@ -76,21 +76,21 @@ const OrderItems = ({ order, styles, formatPrice }) => {
       {/* Order Summary */}
       <div style={styles.orderSummary}>
         <div style={styles.summaryRow}>
-          <span>Tạm tính</span>
+          <span>Subtotal</span>
           <span>{formatPrice(order.subtotal)}</span>
         </div>
         <div style={styles.summaryRow}>
-          <span>Phí vận chuyển</span>
+          <span>Shipping Fee</span>
           <span>{formatPrice(order.shipping_fee)}</span>
         </div>
         {order.discount > 0 && (
           <div style={styles.summaryRow}>
-            <span>Giảm giá</span>
+            <span>Discount</span>
             <span style={{ color: '#647A67' }}>-{formatPrice(order.discount)}</span>
           </div>
         )}
         <div style={styles.summaryTotal}>
-          <span>Tổng cộng</span>
+          <span>Total</span>
           <span style={styles.totalAmount}>{formatPrice(order.total_price || order.total_amount)}</span>
         </div>
       </div>

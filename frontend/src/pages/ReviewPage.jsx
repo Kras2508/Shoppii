@@ -1,29 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import StarRating from './review/StarRating';
 import ImageUploader from './review/ImageUploader';
 import reviewStyles from './review/reviewStyles';
+import { reviewService } from '../api/reviewService';
+import { orderService } from '../api/orderService';
+import createPrivateClient from '../clients/private.client';
 
 const ReviewPage = () => {
   const navigate = useNavigate();
   const { orderId, itemId } = useParams();
-  const { isAuthenticated, user } = useSelector(state => state.auth);
+  const { isAuthenticated, token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
 
-  // Mock order item data
-  const [orderItem] = useState({
-    order_id: orderId || 1001,
-    order_item_id: itemId || 1,
-    product_id: 1,
-    product_name: 'Áo thun nam cotton cao cấp Premium',
-    image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop',
-    color: 'Trắng',
-    type: 'L',
-    quantity: 2,
-    price: 129000,
-    shop_id: 1,
-    shop_name: 'Cửa hàng Kim Tín'
-  });
+  // Order item state
+  const [orderItem, setOrderItem] = useState(null);
+  const [orderItems, setOrderItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Form state
   const [rating, setRating] = useState(0);
@@ -37,6 +31,68 @@ const ReviewPage = () => {
     delivery: false
   });
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  // Fetch order item details
+  useEffect(() => {
+    if (!isAuthenticated || !orderId) {
+      return;
+    }
+
+    const fetchOrderItem = async () => {
+      try {
+        setLoading(true);
+        const response = await orderService.getOrderById(orderId, privateClient);
+        if (response.data?.data?.items) {
+          setOrderItems(response.data.data.items);
+          
+          // If itemId is provided, find that specific item
+          if (itemId) {
+            const item = response.data.data.items.find(i => i.order_item_id == itemId);
+            if (item) {
+              setOrderItem({
+                order_id: orderId,
+                order_item_id: item.order_item_id,
+                product_id: item.product_id,
+                product_name: item.product_name,
+                image_url: item.variant_image || item.product_image,
+                color: item.color,
+                type: item.type,
+                quantity: item.quantity,
+                price: item.price_at_purchase,
+                shop_id: item.shop_id,
+                shop_name: item.shop_name
+              });
+            }
+          } else if (response.data.data.items.length > 0) {
+            // If no itemId, default to first item
+            const item = response.data.data.items[0];
+            setOrderItem({
+              order_id: orderId,
+              order_item_id: item.order_item_id,
+              product_id: item.product_id,
+              product_name: item.product_name,
+              image_url: item.variant_image || item.product_image,
+              color: item.color,
+              type: item.type,
+              quantity: item.quantity,
+              price: item.price_at_purchase,
+              shop_id: item.shop_id,
+              shop_name: item.shop_name
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching order item:', err);
+        setError('Cannot load order item. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrderItem();
+  }, [orderId, itemId, isAuthenticated]);
 
   if (!isAuthenticated) {
     navigate('/signin');
@@ -54,41 +110,62 @@ const ReviewPage = () => {
     e.preventDefault();
 
     if (rating === 0) {
-      alert('Vui lòng chọn đánh giá sao');
+      alert('Please select a star rating');
       return;
     }
 
-    if (productReview.trim().length < 10) {
-      alert('Vui lòng viết tối thiểu 10 ký tự cho đánh giá');
+    if (productReview.trim().length < 5) {
+      alert('Please write at least 5 characters for the review');
       return;
     }
 
-    const reviewData = {
-      order_id: orderItem.order_id,
-      order_item_id: orderItem.order_item_id,
-      product_id: orderItem.product_id,
-      shop_id: orderItem.shop_id,
-      rating,
-      comment: productReview,
-      images: images.map(img => img.src),
-      attributes: Object.keys(attributes).filter(key => attributes[key]),
-      is_anonymous: isAnonymous,
-      created_at: new Date().toISOString()
-    };
+    submitReview();
+  };
 
-    console.log('Review data:', reviewData);
-    setSubmitted(true);
+  const submitReview = async () => {
+    try {
+      setIsSubmitting(true);
+      setError('');
 
-    setTimeout(() => {
-      navigate(`/order/${orderItem.order_id}`);
-    }, 2000);
+      if (!orderItem) {
+        setError('Vui lòng chọn sản phẩm để review');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Backend expects target_type and target_id
+      // We can review both Product and Shop
+      // For now, we'll review the Product
+      const reviewData = {
+        target_type: 'Product',
+        target_id: orderItem.product_id,
+        rating,
+        comment: productReview,
+        image_url: images.length > 0 ? images[0].src : null
+      };
+
+      console.log('📝 Submitting review:', reviewData);
+
+      await reviewService.createReview(reviewData, privateClient);
+
+      console.log('✅ Review submitted successfully');
+      setSubmitted(true);
+
+      setTimeout(() => {
+        navigate(`/order/${orderId}`);
+      }, 2000);
+    } catch (err) {
+      console.error('❌ Error submitting review:', err);
+      setError('Cannot submit review. Please try again later.');
+      setIsSubmitting(false);
+    }
   };
 
   const handleCancel = () => {
-    if (productReview.trim() && !window.confirm('Bạn chắc muốn hủy? Đánh giá của bạn sẽ không được lưu.')) {
+    if (productReview.trim() && !window.confirm('Are you sure you want to cancel? Your review will not be saved.')) {
       return;
     }
-    navigate(`/order/${orderItem.order_id}`);
+    navigate(`/order/${orderId}`);
   };
 
   return (
@@ -99,20 +176,87 @@ const ReviewPage = () => {
           style={reviewStyles.backBtn}
           onClick={handleCancel}
         >
-          ← Quay lại
+          ← Back
         </button>
-        <h1 style={reviewStyles.pageTitle}>Đánh giá sản phẩm</h1>
+        <h1 style={reviewStyles.pageTitle}>Product Review</h1>
       </div>
 
       {/* Success Message */}
       {submitted && (
         <div style={reviewStyles.successMessage}>
           <span style={reviewStyles.successIcon}>✅</span>
-          Cảm ơn bạn đã đánh giá! Đang quay lại trang đơn hàng...
+          Thank you for your review! Redirecting to order page...
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div style={{
+          ...reviewStyles.successMessage,
+          backgroundColor: '#ffebee',
+          color: '#c62828',
+          borderColor: '#ef5350'
+        }}>
+          <span style={{...reviewStyles.successIcon, marginRight: '10px'}}>❌</span>
+          {error}
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div style={reviewStyles.card}>
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            <p>Loading product information...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Item Selector (if multiple items) */}
+      {!loading && orderItems.length > 1 && !itemId && (
+        <div style={reviewStyles.card}>
+          <div style={reviewStyles.cardTitle}>Select a product to review</div>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {orderItems.map(item => (
+              <button
+                key={item.order_item_id}
+                style={{
+                  padding: '12px 16px',
+                  border: orderItem?.order_item_id === item.order_item_id ? '2px solid #647A67' : '1px solid #ddd',
+                  borderRadius: '8px',
+                  backgroundColor: orderItem?.order_item_id === item.order_item_id ? '#f0f4f2' : '#fff',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: '#333'
+                }}
+                onClick={() => {
+                  setOrderItem({
+                    order_id: orderId,
+                    order_item_id: item.order_item_id,
+                    product_id: item.product_id,
+                    product_name: item.product_name,
+                    image_url: item.variant_image || item.product_image,
+                    color: item.color,
+                    type: item.type,
+                    quantity: item.quantity,
+                    price: item.price_at_purchase,
+                    shop_id: item.shop_id,
+                    shop_name: item.shop_name
+                  });
+                  // Reset form
+                  setRating(0);
+                  setProductReview('');
+                  setImages([]);
+                }}
+              >
+                {item.product_name}{item.color ? ` (${item.color}${item.type ? ', ' + item.type : ''})` : ''}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Product Info */}
+      {!loading && orderItem && (
       <div style={reviewStyles.card}>
         <div style={reviewStyles.productInfo}>
           <img
@@ -143,11 +287,11 @@ const ReviewPage = () => {
           {/* Review Text */}
           <div style={reviewStyles.reviewSection}>
             <div style={reviewStyles.reviewLabel}>
-              ✍️ Nhận xét của bạn (tối thiểu 10 ký tự)
+              ✍️ Your review (minimum 5 characters)
             </div>
             <textarea
               style={reviewStyles.textarea}
-              placeholder="Chia sẻ cảm nhận của bạn về sản phẩm này. Những nhận xét chi tiết sẽ giúp người khác hiểu hơn về sản phẩm."
+              placeholder="Share your thoughts about this product. Detailed reviews help others understand the product better."
               value={productReview}
               onChange={(e) => setProductReview(e.target.value.slice(0, 500))}
               onFocus={(e) => e.target.style.borderColor = '#647A67'}
@@ -160,7 +304,7 @@ const ReviewPage = () => {
 
           {/* Attributes */}
           <div style={reviewStyles.optionsSection}>
-            <div style={reviewStyles.optionsTitle}>Những điều bạn thích</div>
+            <div style={reviewStyles.optionsTitle}>What you liked</div>
             <div style={reviewStyles.checkboxGroup}>
               <label style={reviewStyles.checkboxItem}>
                 <input
@@ -169,7 +313,7 @@ const ReviewPage = () => {
                   checked={attributes.quality}
                   onChange={() => handleAttributeChange('quality')}
                 />
-                <span style={reviewStyles.checkboxLabel}>✅ Chất lượng tốt</span>
+                <span style={reviewStyles.checkboxLabel}>Good quality</span>
               </label>
               <label style={reviewStyles.checkboxItem}>
                 <input
@@ -178,7 +322,7 @@ const ReviewPage = () => {
                   checked={attributes.color}
                   onChange={() => handleAttributeChange('color')}
                 />
-                <span style={reviewStyles.checkboxLabel}>🎨 Màu sắc đẹp</span>
+                <span style={reviewStyles.checkboxLabel}>Nice color</span>
               </label>
               <label style={reviewStyles.checkboxItem}>
                 <input
@@ -187,7 +331,7 @@ const ReviewPage = () => {
                   checked={attributes.size}
                   onChange={() => handleAttributeChange('size')}
                 />
-                <span style={reviewStyles.checkboxLabel}>📏 Vừa vặn</span>
+                <span style={reviewStyles.checkboxLabel}>Just right</span>
               </label>
               <label style={reviewStyles.checkboxItem}>
                 <input
@@ -196,7 +340,7 @@ const ReviewPage = () => {
                   checked={attributes.delivery}
                   onChange={() => handleAttributeChange('delivery')}
                 />
-                <span style={reviewStyles.checkboxLabel}>🚚 Giao hàng nhanh</span>
+                <span style={reviewStyles.checkboxLabel}>Fast delivery</span>
               </label>
             </div>
           </div>
@@ -217,7 +361,7 @@ const ReviewPage = () => {
               onChange={(e) => setIsAnonymous(e.target.checked)}
             />
             <span style={reviewStyles.anonymousLabel}>
-              Ẩn danh (tên bạn sẽ không hiển thị)
+              Anonymous (your name will not be displayed)
             </span>
           </label>
 
@@ -228,21 +372,22 @@ const ReviewPage = () => {
               style={reviewStyles.cancelBtn}
               onClick={handleCancel}
             >
-              Hủy
+              Cancel
             </button>
             <button
               type="submit"
               style={{
                 ...reviewStyles.submitBtn,
-                ...(rating === 0 || productReview.length < 10 ? reviewStyles.submitBtnDisabled : {})
+                ...(rating === 0 || productReview.length < 10 || isSubmitting ? reviewStyles.submitBtnDisabled : {})
               }}
-              disabled={rating === 0 || productReview.length < 10}
+              disabled={rating === 0 || productReview.length < 10 || isSubmitting}
             >
-              📤 Gửi đánh giá
+              {isSubmitting ? '⏳ Sending...' : '📤 Submit Review'}
             </button>
           </div>
         </form>
       </div>
+      )}
     </div>
   );
 };

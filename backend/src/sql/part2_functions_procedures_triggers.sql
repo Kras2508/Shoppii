@@ -22,21 +22,51 @@ DELIMITER $$
 
 -- ---------------------------------------------
 -- FUNCTION 1: Calculate Order Total
--- Tính tổng giá trị đơn hàng từ order_item
--- SELECT từ 2 bảng: order_item, order
+-- Tính tổng giá trị đơn hàng = subtotal + shipping_fee - discount
+-- SELECT từ 4 bảng: order_item, order, shipping, voucher
 -- ---------------------------------------------
 CREATE FUNCTION fn_calculate_order_total(p_order_id INT)
 RETURNS DECIMAL(15, 2)
 DETERMINISTIC
 READS SQL DATA
 BEGIN
+    DECLARE v_subtotal DECIMAL(15, 2);
+    DECLARE v_shipping_fee DECIMAL(10, 2);
+    DECLARE v_discount DECIMAL(10, 2);
+    DECLARE v_discount_type VARCHAR(20);
+    DECLARE v_discount_value DECIMAL(10, 2);
     DECLARE v_total DECIMAL(15, 2);
     
+    -- Calculate subtotal from order items
     SELECT COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0)
-    INTO v_total
+    INTO v_subtotal
     FROM OrderItem oi
-    INNER JOIN `Order` o ON oi.order_id = o.order_id
     WHERE oi.order_id = p_order_id;
+    
+    -- Get shipping fee
+    SELECT COALESCE(sh.fee, 0)
+    INTO v_shipping_fee
+    FROM `Order` o
+    LEFT JOIN Shipping sh ON o.shipping_id = sh.shipping_id
+    WHERE o.order_id = p_order_id;
+    
+    -- Get voucher discount
+    SELECT v.discount_type, COALESCE(v.discount_value, 0)
+    INTO v_discount_type, v_discount_value
+    FROM `Order` o
+    LEFT JOIN Voucher v ON o.voucher_id = v.voucher_id
+    WHERE o.order_id = p_order_id;
+    
+    -- Calculate discount amount
+    SET v_discount = 0;
+    IF v_discount_type = 'Percentage' THEN
+        SET v_discount = v_subtotal * (v_discount_value / 100);
+    ELSEIF v_discount_type = 'Amount' THEN
+        SET v_discount = v_discount_value;
+    END IF;
+    
+    -- Calculate total = subtotal + shipping - discount
+    SET v_total = v_subtotal + v_shipping_fee - v_discount;
     
     RETURN v_total;
 END$$
@@ -53,10 +83,9 @@ READS SQL DATA
 BEGIN
     DECLARE v_total_spent DECIMAL(15, 2);
     
-    SELECT COALESCE(SUM(o.total_amount), 0)
+    SELECT COALESCE(SUM(fn_calculate_order_total(o.order_id)), 0)
     INTO v_total_spent
     FROM `Order` o
-    INNER JOIN Customer c ON o.customer_id = c.customer_id
     WHERE o.customer_id = p_customer_id
       AND o.status != 'Cancelled';
     
@@ -74,14 +103,55 @@ DETERMINISTIC
 READS SQL DATA
 BEGIN
     DECLARE v_revenue DECIMAL(15, 2);
+    DECLARE v_subtotal DECIMAL(15, 2);
+    DECLARE v_shipping_total DECIMAL(15, 2);
+    DECLARE v_discount_total DECIMAL(15, 2);
     
+    -- Tính tổng doanh thu shop (OrderItem + Shipping - Voucher discount)
+    -- Chỉ tính các đơn hàng không bị cancelled
+    
+    -- Tính subtotal từ OrderItem
     SELECT COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0)
-    INTO v_revenue
+    INTO v_subtotal
     FROM OrderItem oi
     INNER JOIN `Order` o ON oi.order_id = o.order_id
-    INNER JOIN Shop s ON oi.shop_id = s.shop_id
-    WHERE oi.shop_id = p_shop_id
-      AND o.status != 'Cancelled';
+    WHERE oi.shop_id = p_shop_id AND o.status != 'Cancelled';
+    
+    -- Tính shipping fees (chia đều cho các shop nếu 1 order có nhiều shop)
+    SELECT COALESCE(SUM(s.fee), 0)
+    INTO v_shipping_total
+    FROM `Order` o
+    INNER JOIN Shipping s ON o.shipping_id = s.shipping_id
+    WHERE o.order_id IN (
+        SELECT DISTINCT oi.order_id 
+        FROM OrderItem oi 
+        WHERE oi.shop_id = p_shop_id
+    )
+    AND o.status != 'Cancelled';
+    
+    -- Tính voucher discount (chia đều cho các shop nếu 1 order có nhiều shop)
+    SELECT COALESCE(SUM(
+        CASE 
+            WHEN v.discount_type = 'Percentage' THEN v_subtotal * v.discount_value / 100
+            WHEN v.discount_type = 'Amount' THEN v.discount_value
+            ELSE 0
+        END
+    ), 0)
+    INTO v_discount_total
+    FROM `Order` o
+    LEFT JOIN Voucher v ON o.voucher_id = v.voucher_id
+    WHERE o.order_id IN (
+        SELECT DISTINCT oi.order_id 
+        FROM OrderItem oi 
+        WHERE oi.shop_id = p_shop_id
+    )
+    AND o.status != 'Cancelled';
+    
+    SET v_revenue = v_subtotal + v_shipping_total - v_discount_total;
+    
+    IF v_revenue < 0 THEN
+        SET v_revenue = 0;
+    END IF;
     
     RETURN v_revenue;
 END$$
@@ -329,6 +399,7 @@ CREATE PROCEDURE sp_create_order_from_cart(
     IN p_voucher_id INT,
     IN p_shipping_address VARCHAR(255),
     IN p_payment_method VARCHAR(50),
+    IN p_note TEXT,
     OUT p_order_id INT
 )
 BEGIN
@@ -438,25 +509,41 @@ BEGIN
     -- Create order
     INSERT INTO `Order` (
         customer_id, shipping_id, voucher_id, status,
-        shipping_address, total_amount, payment_method
+        shipping_address, total_amount, payment_method, note
     ) VALUES (
         p_customer_id, p_shipping_id, p_voucher_id, 'Processing',
-        p_shipping_address, v_total_amount, p_payment_method
+        p_shipping_address, v_total_amount, p_payment_method, p_note
     );
     
     SET p_order_id = LAST_INSERT_ID();
     
-    -- Move cart items to order items
-    INSERT INTO OrderItem (order_id, item_id, shop_id, quantity, price_at_purchase)
-    SELECT 
-        p_order_id,
-        ci.item_id,
-        pi.shop_id,
-        ci.quantity,
-        pi.price
+    -- Move cart items to order items (WITHOUT trigger to avoid conflict)
+    -- Store cart items in temporary table first
+    CREATE TEMPORARY TABLE IF NOT EXISTS temp_cart_items (
+        item_id INT,
+        shop_id INT,
+        quantity INT,
+        price DECIMAL(10, 2)
+    );
+    
+    INSERT INTO temp_cart_items (item_id, shop_id, quantity, price)
+    SELECT ci.item_id, pi.shop_id, ci.quantity, pi.price
     FROM CartItem ci
     INNER JOIN ProductItem pi ON ci.item_id = pi.item_id
     WHERE ci.cart_id = v_cart_id;
+    
+    -- Insert into OrderItem from temp table
+    INSERT INTO OrderItem (order_id, item_id, shop_id, quantity, price_at_purchase)
+    SELECT p_order_id, item_id, shop_id, quantity, price
+    FROM temp_cart_items;
+    
+    -- Update stock manually (instead of trigger)
+    UPDATE ProductItem pi
+    INNER JOIN temp_cart_items tci ON pi.item_id = tci.item_id
+    SET pi.stock = pi.stock - tci.quantity;
+    
+    -- Drop temp table
+    DROP TEMPORARY TABLE IF EXISTS temp_cart_items;
     
     -- Clear cart
     DELETE FROM CartItem WHERE cart_id = v_cart_id;
@@ -469,59 +556,12 @@ BEGIN
 END$$
 
 -- ---------------------------------------------
--- PROCEDURE 3: Get Product Statistics
--- Lấy thống kê sản phẩm với filters
--- Có WHERE, JOIN, GROUP BY
--- ---------------------------------------------
-CREATE PROCEDURE sp_get_product_statistics(
-    IN p_category_id INT,
-    IN p_shop_id INT,
-    IN p_min_price DECIMAL(10, 2),
-    IN p_max_price DECIMAL(10, 2)
-)
-BEGIN
-    SELECT 
-        p.product_id,
-        p.product_name,
-        c.category_name,
-        s.shop_name,
-        COUNT(pi.item_id) AS variant_count,
-        MIN(pi.price) AS min_price,
-        MAX(pi.price) AS max_price,
-        SUM(pi.stock) AS total_stock,
-        COALESCE(SUM(oi.quantity), 0) AS total_sold,
-        COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) AS total_revenue,
-        COUNT(DISTINCT r.review_id) AS review_count,
-        COALESCE(AVG(r.rating), 0) AS avg_rating,
-        p.status,
-        p.created_at
-    FROM Product p
-    INNER JOIN Category c ON p.category_id = c.category_id
-    INNER JOIN Shop s ON p.shop_id = s.shop_id
-    LEFT JOIN ProductItem pi ON p.product_id = pi.product_id
-    LEFT JOIN OrderItem oi ON pi.item_id = oi.item_id
-    LEFT JOIN `Order` o ON oi.order_id = o.order_id 
-        AND o.status != 'Cancelled'
-    LEFT JOIN Review r ON p.product_id = r.target_id 
-        AND r.target_type = 'Product'
-    WHERE 
-        (p_category_id IS NULL OR p.category_id = p_category_id)
-        AND (p_shop_id IS NULL OR p.shop_id = p_shop_id)
-        AND (p_min_price IS NULL OR pi.price >= p_min_price)
-        AND (p_max_price IS NULL OR pi.price <= p_max_price)
-    GROUP BY 
-        p.product_id, p.product_name, c.category_name, s.shop_name,
-        p.status, p.created_at
-    ORDER BY total_revenue DESC;
-END$$
-
--- ---------------------------------------------
--- PROCEDURE 4: Apply Voucher
+-- PROCEDURE 3: Apply Voucher
 -- Kiểm tra và áp dụng voucher
 -- Có IF, CASE, validation
 -- ---------------------------------------------
 CREATE PROCEDURE sp_apply_voucher(
-    IN p_voucher_code INT,
+    IN p_voucher_code VARCHAR(50),
     IN p_order_amount DECIMAL(15, 2),
     OUT p_discount_amount DECIMAL(10, 2),
     OUT p_is_valid TINYINT,
@@ -540,7 +580,7 @@ BEGIN
     SET p_is_valid = 0;
     SET p_discount_amount = 0;
     
-    -- Get voucher details
+    -- Get voucher details by code
     SELECT 
         voucher_id, discount_type, discount_value, min_order_value,
         usage_limit, used_count, expired_date, status
@@ -548,7 +588,7 @@ BEGIN
         v_voucher_id, v_discount_type, v_discount_value, v_min_order_value,
         v_usage_limit, v_used_count, v_expired_date, v_status
     FROM Voucher
-    WHERE voucher_id = p_voucher_code;
+    WHERE code = p_voucher_code;
     
     -- Check if voucher exists
     IF v_voucher_id IS NULL THEN
@@ -844,7 +884,7 @@ CALL sp_get_shop_revenue_report(4, '2025-01-01', '2025-12-31');
 CALL sp_get_product_statistics(NULL, NULL, NULL, NULL);
 
 -- Test Procedure 4: Apply Voucher
-CALL sp_apply_voucher(1, 600000, @discount, @valid, @message);
+CALL sp_apply_voucher('DISCOUNT10', 600000, @discount, @valid, @message);
 SELECT @discount AS discount_amount, @valid AS is_valid, @message AS message;
 
 -- =============================================

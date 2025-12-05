@@ -26,4 +26,14 @@ export const orderService = {
   cancelOrder: (id, privateClient) => {
     return privateClient.put(`/orders/${id}/cancel`)
   },
+
+  // Get payment methods (from Order ENUM)
+  getPaymentMethods: () => {
+    return publicClient.get('/orders/payment-methods')
+  },
+
+  // Calculate order preview (backend calculation)
+  calculateOrderPreview: (data, privateClient) => {
+    return privateClient.post('/orders/preview', data)
+  },
 }

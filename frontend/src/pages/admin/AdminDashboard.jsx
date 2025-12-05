@@ -1,38 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import adminStyles from './adminStyles.js';
+import { adminService } from '../../api/adminService.js';
+import createPrivateClient from '../../clients/private.client';
 
 const AdminDashboard = () => {
-  // Mock data - sẽ thay bằng API calls sau
-  const stats = {
-    totalUsers: 15420,
-    totalShops: 856,
-    totalOrders: 45230,
-    totalRevenue: 12500000000, // 12.5 tỷ
-    newUsersToday: 128,
-    newOrdersToday: 342,
-    pendingShops: 12,
-    reportedReviews: 8
-  };
+  const { token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
 
-  const recentActivities = [
-    { id: 1, type: 'user', action: 'Người dùng mới đăng ký', detail: 'nguyenvana@gmail.com', time: '2 phút trước', icon: '👤' },
-    { id: 2, type: 'shop', action: 'Shop mới yêu cầu xác minh', detail: 'Fashion Store', time: '5 phút trước', icon: '🏪' },
-    { id: 3, type: 'order', action: 'Đơn hàng mới', detail: '#ORD-12345 - 2,500,000đ', time: '8 phút trước', icon: '🛒' },
-    { id: 4, type: 'report', action: 'Review bị báo cáo', detail: 'Nội dung không phù hợp', time: '15 phút trước', icon: '⚠️' },
-    { id: 5, type: 'user', action: 'Người dùng mới đăng ký', detail: 'tranthib@gmail.com', time: '20 phút trước', icon: '👤' },
-    { id: 6, type: 'shop', action: 'Shop đã được xác minh', detail: 'Tech World', time: '30 phút trước', icon: '✅' },
-    { id: 7, type: 'order', action: 'Đơn hàng hoàn thành', detail: '#ORD-12340 - 1,200,000đ', time: '45 phút trước', icon: '📦' },
-    { id: 8, type: 'product', action: 'Sản phẩm bị báo cáo', detail: 'iPhone 15 Pro Max (fake)', time: '1 giờ trước', icon: '📱' }
-  ];
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalShops: 0,
+    totalOrders: 0,
+    totalRevenue: 0
+  });
 
-  const topShops = [
-    { id: 1, name: 'Fashion House', orders: 1245, revenue: 450000000, rating: 4.8 },
-    { id: 2, name: 'Tech World', orders: 980, revenue: 890000000, rating: 4.9 },
-    { id: 3, name: 'Home & Living', orders: 756, revenue: 320000000, rating: 4.7 },
-    { id: 4, name: 'Beauty Corner', orders: 654, revenue: 180000000, rating: 4.6 },
-    { id: 5, name: 'Sports Zone', orders: 543, revenue: 250000000, rating: 4.5 }
-  ];
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [topShops, setTopShops] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const response = await adminService.getDashboard(privateClient);
+        
+        if (response.data?.data) {
+          const data = response.data.data;
+          
+          // Process user stats
+          let totalUsers = 0;
+          let totalShops = 0;
+          if (Array.isArray(data.users)) {
+            data.users.forEach(user => {
+              if (user.role === 'Customer') totalUsers += user.count;
+              else if (user.role === 'Shop') totalShops += user.count;
+            });
+          }
+          
+          // Process order stats
+          const orderStats = data.orders || {};
+          const totalRevenue = parseFloat(orderStats.total_revenue || 0);
+          const totalOrders = orderStats.total_orders || 0;
+          
+          setStats({
+            totalUsers,
+            totalShops,
+            totalOrders,
+            totalRevenue
+          });
+          
+          // Set recent orders as activities
+          if (Array.isArray(data.recent_orders)) {
+            setRecentActivities(data.recent_orders.map((order, idx) => ({
+              id: idx + 1,
+              type: 'order',
+              action: `Đơn hàng mới - ${order.status}`,
+              detail: `${order.customer_name} - ${order.total_amount ? Math.round(order.total_amount).toLocaleString('vi-VN') + 'đ' : 'N/A'}`,
+              time: new Date(order.created_at).toLocaleDateString('vi-VN'),
+              icon: '🛒'
+            })));
+          }
+          
+          // Set top shops
+          if (Array.isArray(data.top_shops)) {
+            setTopShops(data.top_shops.map(shop => ({
+              id: shop.shop_id,
+              name: shop.shop_name,
+              orders: shop.product_count,
+              revenue: parseFloat(shop.total_revenue || 0),
+              rating: shop.rating || 0
+            })));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchDashboardData();
+    }
+  }, [token]);
 
   const formatCurrency = (amount) => {
     if (amount >= 1000000000) {
@@ -167,13 +219,6 @@ const AdminDashboard = () => {
     { label: 'Doanh thu', value: formatCurrency(stats.totalRevenue) + 'đ', icon: '💰', color: '#f39c12', sub: 'Tổng doanh thu' }
   ];
 
-  const quickActions = [
-    { icon: '👥', label: 'Quản lý Users', path: '/admin/users' },
-    { icon: '🏪', label: 'Duyệt Shop', path: '/admin/shops' },
-    { icon: '⚠️', label: 'Review báo cáo', path: '/admin/reviews', badge: stats.reportedReviews },
-    { icon: '📊', label: 'Báo cáo', path: '/admin/reports' }
-  ];
-
   return (
     <div>
       {/* Welcome Card */}
@@ -204,43 +249,6 @@ const AdminDashboard = () => {
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Quick Actions */}
-      <div style={{ marginTop: '24px' }}>
-        <h3 style={styles.sectionTitle}>Thao tác nhanh</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-          {quickActions.map((action, index) => (
-            <Link
-              key={index}
-              to={action.path}
-              style={styles.quickActionBtn}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#e8e9ea';
-                e.currentTarget.style.borderColor = '#999';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#f8f9fa';
-                e.currentTarget.style.borderColor = '#ddd';
-              }}
-            >
-              <span style={{ fontSize: '24px' }}>{action.icon}</span>
-              <span style={{ fontWeight: '500' }}>{action.label}</span>
-              {action.badge && (
-                <span style={{
-                  backgroundColor: '#e74c3c',
-                  color: 'white',
-                  padding: '2px 8px',
-                  borderRadius: '10px',
-                  fontSize: '11px',
-                  marginLeft: 'auto'
-                }}>
-                  {action.badge}
-                </span>
-              )}
-            </Link>
-          ))}
-        </div>
       </div>
 
       {/* Main Grid */}

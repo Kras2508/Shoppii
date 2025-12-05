@@ -7,23 +7,36 @@ const OrderDetailSummary = ({ order, styles, formatPrice }) => {
   }, 0) || 0;
 
   const shippingFee = order.shipping_fee || order.shipping?.fee || 0;
-  const discount = order.discount || order.voucher?.discount_amount || 0;
-  const total = order.total_price || order.total_amount || (subtotal + shippingFee - discount);
+  
+  // Calculate discount based on discount_type and discount_value
+  let discount = 0;
+  if (order.discount_value && order.discount_type) {
+    if (order.discount_type === 'Percentage') {
+      discount = (subtotal * order.discount_value) / 100;
+    } else if (order.discount_type === 'Amount') {
+      discount = order.discount_value * 1000;
+    } else {
+      discount = order.discount_value;
+    }
+  }
+  
+  // Use calculated_total from backend (fn_calculate_order_total) or fallback
+  const total = order.calculated_total || order.total_price || order.total_amount || (subtotal + shippingFee - discount);
 
   return (
     <div>
       <div style={styles.summaryRow}>
-        <span style={styles.summaryLabel}>Tạm tính</span>
+        <span style={styles.summaryLabel}>Subtotal</span>
         <span style={styles.summaryValue}>{formatPrice(subtotal)}</span>
       </div>
       <div style={styles.summaryRow}>
-        <span style={styles.summaryLabel}>Phí vận chuyển</span>
+        <span style={styles.summaryLabel}>Shipping Fee</span>
         <span style={styles.summaryValue}>{formatPrice(shippingFee)}</span>
       </div>
       {discount > 0 && (
         <div style={styles.summaryRow}>
           <span style={styles.summaryLabel}>
-            Giảm giá {order.voucher?.code ? `(${order.voucher.code})` : ''}
+            Discount {order.voucher_code ? `(${order.voucher_code})` : ''}
           </span>
           <span style={{ ...styles.summaryValue, color: '#647A67' }}>
             -{formatPrice(discount)}
@@ -31,7 +44,7 @@ const OrderDetailSummary = ({ order, styles, formatPrice }) => {
         </div>
       )}
       <div style={styles.summaryTotal}>
-        <span style={styles.totalLabel}>Tổng cộng</span>
+        <span style={styles.totalLabel}>Total</span>
         <span style={styles.totalValue}>{formatPrice(total)}</span>
       </div>
     </div>

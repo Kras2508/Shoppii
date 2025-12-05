@@ -35,7 +35,7 @@ const OrderConfirmationPage = () => {
           }
         } catch (err) {
           console.error('Error fetching order:', err);
-          setError('Không thể tải thông tin đơn hàng');
+          setError('Can not load order details.');
         } finally {
           setLoading(false);
         }
@@ -45,7 +45,8 @@ const OrderConfirmationPage = () => {
   }, [order, orderId, isAuthenticated, navigate]);
 
   const formatPrice = (price) => {
-    return price.toLocaleString('vi-VN') + 'đ';
+    if (price == null || isNaN(price)) return ' VND';
+    return Math.floor(price).toLocaleString('vi-VN') + ' VND';
   };
 
   if (loading) {
@@ -54,7 +55,7 @@ const OrderConfirmationPage = () => {
         <div style={orderStyles.container}>
           <div style={{ textAlign: 'center', padding: '60px' }}>
             <div style={{ fontSize: '40px', marginBottom: '16px' }}>⏳</div>
-            <p>Đang tải thông tin đơn hàng...</p>
+            <p>Loading order information...</p>
           </div>
         </div>
       </div>
@@ -67,12 +68,12 @@ const OrderConfirmationPage = () => {
         <div style={orderStyles.container}>
           <div style={{ textAlign: 'center', padding: '60px', backgroundColor: 'white', borderRadius: '8px' }}>
             <div style={{ fontSize: '60px', marginBottom: '16px' }}>📦</div>
-            <h2 style={{ marginBottom: '12px' }}>Không tìm thấy đơn hàng</h2>
+            <h2 style={{ marginBottom: '12px' }}>Order Not Found</h2>
             <p style={{ color: '#758173', marginBottom: '24px' }}>
-              Đơn hàng không tồn tại hoặc bạn không có quyền xem.
+              Order not found. Please check your order history.
             </p>
             <Link to="/" style={orderStyles.primaryBtn}>
-              Về Trang Chủ
+              Back to Home
             </Link>
           </div>
         </div>

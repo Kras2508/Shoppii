@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 const CartItem = ({ item, selected, onQuantityChange, onSelect, onRemove, styles }) => {
   const formatPrice = (price) => {
-    return ((price || 0) * 1000).toLocaleString('vi-VN') + ' VND';
+    return ((price || 0)).toLocaleString('vi-VN') + ' VND';
   };
 
   return (
@@ -35,9 +35,9 @@ const CartItem = ({ item, selected, onQuantityChange, onSelect, onRemove, styles
             {item.product_name}
           </Link>
           <div style={styles.productVariant}>
-            {item.color && `Màu: ${item.color}`}
+            {item.color && `Color: ${item.color}`}
             {item.color && item.type && ', '}
-            {item.type && `Loại: ${item.type}`}
+            {item.type && `Type: ${item.type}`}
           </div>
         </div>
       </div>
@@ -85,7 +85,7 @@ const CartItem = ({ item, selected, onQuantityChange, onSelect, onRemove, styles
         onMouseEnter={(e) => e.target.style.color = '#d9534f'}
         onMouseLeave={(e) => e.target.style.color = '#999'}
       >
-        Xóa
+        Delete
       </button>
     </div>
   );

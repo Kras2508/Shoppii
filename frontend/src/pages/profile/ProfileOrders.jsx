@@ -5,11 +5,11 @@ const ProfileOrders = ({ orders, filter, setFilter, styles, formatPrice }) => {
   const navigate = useNavigate();
 
   const filters = [
-    { key: 'all', label: 'Tất cả' },
-    { key: 'Processing', label: 'Đang xử lý' },
-    { key: 'Shipped', label: 'Đang giao' },
-    { key: 'Delivered', label: 'Đã giao' },
-    { key: 'Cancelled', label: 'Đã hủy' }
+    { key: 'all', label: 'All' },
+    { key: 'Processing', label: 'Processing' },
+    { key: 'Shipped', label: 'Shipped' },
+    { key: 'Delivered', label: 'Delivered' },
+    { key: 'Cancelled', label: 'Cancelled' }
   ];
 
   const getStatusStyle = (status) => {
@@ -29,10 +29,10 @@ const ProfileOrders = ({ orders, filter, setFilter, styles, formatPrice }) => {
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'Processing': return 'Đang xử lý';
-      case 'Shipped': return 'Đang giao';
-      case 'Delivered': return 'Đã giao';
-      case 'Cancelled': return 'Đã hủy';
+      case 'Processing': return 'Processing';
+      case 'Shipped': return 'Shipped';
+      case 'Delivered': return 'Delivered';
+      case 'Cancelled': return 'Cancelled';
       default: return status;
     }
   };
@@ -55,6 +55,7 @@ const ProfileOrders = ({ orders, filter, setFilter, styles, formatPrice }) => {
     navigate(`/order/${order.order_id}`, { state: { order } });
   };
 
+  // Show empty state only if no orders at all
   if (orders.length === 0) {
     return (
       <div style={styles.emptyState}>
@@ -63,6 +64,34 @@ const ProfileOrders = ({ orders, filter, setFilter, styles, formatPrice }) => {
         <Link to="/products">
           <button style={styles.emptyAction}>Mua sắm ngay</button>
         </Link>
+      </div>
+    );
+  }
+
+  // Show "no results" if filter returns no orders but orders exist
+  if (filteredOrders.length === 0) {
+    return (
+      <div>
+        {/* Filters */}
+        <div style={styles.orderFilters}>
+          {filters.map(f => (
+            <button
+              key={f.key}
+              style={{
+                ...styles.filterBtn,
+                ...(filter === f.key ? styles.filterBtnActive : {})
+              }}
+              onClick={() => setFilter(f.key)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Empty state for filter */}
+        <div style={styles.emptyState}>
+          <p style={styles.emptyText}>Không có đơn hàng nào với trạng thái này</p>
+        </div>
       </div>
     );
   }
@@ -87,13 +116,8 @@ const ProfileOrders = ({ orders, filter, setFilter, styles, formatPrice }) => {
 
       {/* Orders List */}
       <div style={styles.ordersList}>
-        {filteredOrders.length === 0 ? (
-          <div style={styles.emptyState}>
-            <p style={styles.emptyText}>Không có đơn hàng nào</p>
-          </div>
-        ) : (
-          filteredOrders.map(order => (
-            <div key={order.order_id} style={styles.orderCard}>
+        {filteredOrders.map(order => (
+          <div key={order.order_id} style={styles.orderCard}>
               {/* Order Header */}
               <div style={styles.orderHeader}>
                 <div style={styles.orderShop}>
@@ -116,7 +140,7 @@ const ProfileOrders = ({ orders, filter, setFilter, styles, formatPrice }) => {
                     }}
                   >
                     <img
-                      src={item.image_url}
+                      src={item.variant_image || item.product_image || item.image_url || '/placeholder.png'}
                       alt={item.product_name}
                       style={styles.orderItemImage}
                     />
@@ -133,7 +157,7 @@ const ProfileOrders = ({ orders, filter, setFilter, styles, formatPrice }) => {
                 ))}
                 {order.items.length > 2 && (
                   <div style={{ textAlign: 'center', color: '#999', fontSize: '14px' }}>
-                    +{order.items.length - 2} sản phẩm khác
+                    +{order.items.length - 2} more products
                   </div>
                 )}
               </div>
@@ -149,33 +173,32 @@ const ProfileOrders = ({ orders, filter, setFilter, styles, formatPrice }) => {
                       style={{ ...styles.orderActionBtn, ...styles.viewOrderBtn }}
                       onClick={() => handleViewOrder(order)}
                     >
-                      Xem chi tiết
+                      View Details
                     </button>
                     {order.status === 'Delivered' && (
                       <button 
                         style={{ ...styles.orderActionBtn, ...styles.reviewBtn }}
                         onClick={() => navigate(`/review/${order.order_id}`)}
                       >
-                        Đánh giá
+                        Review
                       </button>
                     )}
                     {order.status === 'Delivered' && (
                       <button style={{ ...styles.orderActionBtn, ...styles.reorderBtn }}>
-                        Mua lại
+                        Reorder
                       </button>
                     )}
                   </div>
                 </div>
                 <div style={styles.orderTotal}>
-                  <span style={styles.orderTotalLabel}>Tổng tiền:</span>
+                  <span style={styles.orderTotalLabel}>Total:</span>
                   <span style={styles.orderTotalValue}>
-                    {formatPrice(order.total_amount)}
+                    {formatPrice(order.calculated_total || order.total_amount)}
                   </span>
                 </div>
               </div>
             </div>
-          ))
-        )}
+          ))}
       </div>
     </div>
   );

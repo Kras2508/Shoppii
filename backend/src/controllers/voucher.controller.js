@@ -20,6 +20,7 @@ export const getVouchers = async (req, res) => {
     const [vouchers] = await pool.query(`
       SELECT 
         voucher_id,
+        code,
         discount_type,
         discount_value,
         min_order_value,
@@ -96,19 +97,19 @@ export const getVoucherById = async (req, res) => {
 // Apply voucher (using stored procedure)
 export const applyVoucher = async (req, res) => {
   try {
-    const { voucher_id, order_amount } = req.body;
+    const { code, order_amount } = req.body;
 
-    if (!voucher_id || !order_amount) {
+    if (!code || !order_amount) {
       return res.status(400).json({
         success: false,
-        message: 'Voucher ID and order amount are required'
+        message: 'Voucher code and order amount are required'
       });
     }
 
-    // Call stored procedure
+    // Call stored procedure with voucher code
     await pool.query(
       'CALL sp_apply_voucher(?, ?, @discount, @valid, @message)',
-      [voucher_id, order_amount]
+      [code, order_amount]
     );
 
     const [result] = await pool.query(
@@ -147,6 +148,7 @@ export const applyVoucher = async (req, res) => {
 export const createVoucher = async (req, res) => {
   try {
     const { 
+      code,
       discount_type, 
       discount_value, 
       min_order_value = 0, 
@@ -154,10 +156,10 @@ export const createVoucher = async (req, res) => {
       usage_limit = 1 
     } = req.body;
 
-    if (!discount_type || !discount_value || !expired_date) {
+    if (!code || !discount_type || !discount_value || !expired_date) {
       return res.status(400).json({
         success: false,
-        message: 'Discount type, value and expiry date are required'
+        message: 'Code, discount type, value and expiry date are required'
       });
     }
 
@@ -169,9 +171,9 @@ export const createVoucher = async (req, res) => {
     }
 
     const [result] = await pool.query(`
-      INSERT INTO Voucher (discount_type, discount_value, min_order_value, expired_date, usage_limit)
-      VALUES (?, ?, ?, ?, ?)
-    `, [discount_type, discount_value, min_order_value, expired_date, usage_limit]);
+      INSERT INTO Voucher (code, discount_type, discount_value, min_order_value, expired_date, usage_limit)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [code, discount_type, discount_value, min_order_value, expired_date, usage_limit]);
 
     res.status(201).json({
       success: true,
@@ -193,11 +195,15 @@ export const createVoucher = async (req, res) => {
 export const updateVoucher = async (req, res) => {
   try {
     const { id } = req.params;
-    const { discount_type, discount_value, min_order_value, expired_date, usage_limit, status } = req.body;
+    const { code, discount_type, discount_value, min_order_value, expired_date, usage_limit, status } = req.body;
 
     const updateFields = [];
     const updateValues = [];
 
+    if (code) {
+      updateFields.push('code = ?');
+      updateValues.push(code);
+    }
     if (discount_type) {
       if (!['Percentage', 'Amount'].includes(discount_type)) {
         return res.status(400).json({

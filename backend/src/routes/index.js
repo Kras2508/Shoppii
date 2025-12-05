@@ -9,6 +9,7 @@ import categoryRoutes from './category.routes.js';
 import shippingRoutes from './shipping.routes.js';
 import voucherRoutes from './voucher.routes.js';
 import adminRoutes from './admin.routes.js';
+import customerRoutes from './customer.routes.js';
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.use('/categories', categoryRoutes);
 router.use('/shipping', shippingRoutes);
 router.use('/vouchers', voucherRoutes);
 router.use('/admin', adminRoutes);
+router.use('/customer', customerRoutes);
 
 // Health check
 router.get('/health', (req, res) => {

@@ -16,13 +16,13 @@ const CheckoutVoucherSection = ({
   return (
     <div style={styles.section}>
       <h2 style={styles.sectionTitle}>
-        <span>🎟️</span> Mã Giảm Giá
+        <span>🎟️</span> Vouchers
       </h2>
       {selectedVoucher ? (
         <div style={styles.voucherApplied}>
           <span>✓</span>
           <span style={{ flex: 1 }}>
-            {selectedVoucher.code} - Giảm {
+            {selectedVoucher.code} - Discount {
               selectedVoucher.discount_type === 'Percentage' 
                 ? `${selectedVoucher.discount_value}%` 
                 : formatPrice(selectedVoucher.discount_value)
@@ -40,7 +40,7 @@ const CheckoutVoucherSection = ({
           <div style={styles.voucherRow}>
             <input
               type="text"
-              placeholder="Nhập mã voucher"
+              placeholder="Enter voucher code"
               value={voucherCode}
               onChange={(e) => setVoucherCode(e.target.value)}
               onFocus={() => setShowVoucherDropdown(true)}
@@ -52,7 +52,7 @@ const CheckoutVoucherSection = ({
               onMouseEnter={(e) => e.target.style.backgroundColor = '#556B5A'}
               onMouseLeave={(e) => e.target.style.backgroundColor = '#647A67'}
             >
-              Áp dụng
+              Apply
             </button>
           </div>
           
@@ -95,7 +95,7 @@ const CheckoutVoucherSection = ({
                   ✕
                 </button>
               </div>
-              {availableVouchers
+              {(availableVouchers || [])
                 .filter(v => v.status === 'Active' && v.used_count < v.usage_limit)
                 .map(voucher => {
                   const isEligible = subtotal >= voucher.min_order_value;
@@ -138,8 +138,8 @@ const CheckoutVoucherSection = ({
                           fontWeight: '600'
                         }}>
                           {voucher.discount_type === 'Percentage' 
-                            ? `-${voucher.discount_value}%` 
-                            : `-${(voucher.discount_value/1000)}K`}
+                            ? `${voucher.discount_value}%` 
+                            : `${(voucher.discount_value).toLocaleString('vi-VN')} VND`}
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{
@@ -154,13 +154,13 @@ const CheckoutVoucherSection = ({
                             fontSize: '12px',
                             color: '#758173'
                           }}>
-                            Đơn tối thiểu {formatPrice(voucher.min_order_value)}
+                            Minimum order {formatPrice(voucher.min_order_value)}
                           </div>
                         </div>
                         {isEligible ? (
-                          <span style={{ color: '#647A67', fontSize: '12px' }}>Dùng ngay</span>
+                          <span style={{ color: '#647A67', fontSize: '12px' }}>Apply</span>
                         ) : (
-                          <span style={{ color: '#999', fontSize: '11px' }}>Chưa đủ điều kiện</span>
+                          <span style={{ color: '#999', fontSize: '11px' }}>Not eligible</span>
                         )}
                       </div>
                     </div>

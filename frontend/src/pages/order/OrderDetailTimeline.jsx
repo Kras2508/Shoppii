@@ -4,27 +4,27 @@ const OrderDetailTimeline = ({ status, styles, createdAt }) => {
   const steps = [
     {
       key: 'Pending',
-      label: 'Đặt hàng thành công',
+      label: 'Successfully placed',
       icon: '📝',
-      desc: 'Đơn hàng đã được đặt'
+      desc: 'Order has been placed'
     },
     {
       key: 'Processing',
-      label: 'Đang xử lý',
+      label: 'Processing',
       icon: '📦',
-      desc: 'Shop đang chuẩn bị hàng'
+      desc: 'Shop is preparing the order'
     },
     {
       key: 'Shipped',
-      label: 'Đang giao hàng',
+      label: 'Shipping',
       icon: '🚚',
-      desc: 'Đơn hàng đang được vận chuyển'
+      desc: 'Order is being shipped'
     },
     {
       key: 'Delivered',
-      label: 'Đã giao hàng',
+      label: 'Delivered',
       icon: '✅',
-      desc: 'Giao hàng thành công'
+      desc: 'Order has been delivered'
     }
   ];
 
@@ -59,10 +59,10 @@ const OrderDetailTimeline = ({ status, styles, createdAt }) => {
       <div style={{ textAlign: 'center', padding: '20px' }}>
         <div style={{ fontSize: '48px', marginBottom: '12px' }}>❌</div>
         <div style={{ fontSize: '18px', fontWeight: '600', color: '#dc3545' }}>
-          Đơn hàng đã bị hủy
+          This order has been cancelled
         </div>
         <div style={{ color: '#666', marginTop: '8px' }}>
-          Đơn hàng này đã được hủy bởi bạn hoặc người bán
+          This order has been cancelled by you or the seller
         </div>
       </div>
     );

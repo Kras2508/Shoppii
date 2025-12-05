@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 const ProductCard = ({ product }) => {
   const formatPrice = (price) => {
-    return ((price || 0) * 1000).toLocaleString('vi-VN') + ' VND';
+    return ((price || 0)).toLocaleString('vi-VN') + ' VND';
   };
 
   const styles = {

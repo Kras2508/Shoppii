@@ -130,6 +130,7 @@ CREATE TABLE Shipping (
 -- VOUCHER (Order N-1 Voucher)
 CREATE TABLE Voucher (
     voucher_id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(50) UNIQUE NOT NULL,
     discount_type ENUM('Percentage','Amount') NOT NULL,
     discount_value DECIMAL(10,2) NOT NULL CHECK(discount_value >= 0),
     min_order_value DECIMAL(15,2) DEFAULT 0 CHECK(min_order_value >= 0),
@@ -150,7 +151,8 @@ CREATE TABLE `Order` (
     order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     shipping_address VARCHAR(255) NOT NULL,
     total_amount DECIMAL(15,2) DEFAULT 0,
-    payment_method VARCHAR(50) NOT NULL,
+    payment_method ENUM('COD','Banking','Momo','ZaloPay') NOT NULL DEFAULT 'COD',
+    note TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES Customer(customer_id),

@@ -146,33 +146,33 @@ const Footer = () => {
   const [hoveredLink, setHoveredLink] = React.useState(null);
 
   const customerCareLinks = [
-    { id: 1, text: 'Trung Tâm Trợ Giúp', href: '/help' },
+    { id: 1, text: 'Help Center', href: '/help' },
     { id: 2, text: 'ShopMart Blog', href: '/blog' },
-    { id: 3, text: 'Hướng Dẫn Mua Hàng', href: '/guide' },
-    { id: 4, text: 'Hướng Dẫn Bán Hàng', href: '/sell-guide' },
-    { id: 5, text: 'Thanh Toán', href: '/payment' },
-    { id: 6, text: 'Vận Chuyển', href: '/shipping' },
-    { id: 7, text: 'Trả Hàng & Hoàn Tiền', href: '/returns' }
+    { id: 3, text: 'Purchase Guide', href: '/guide' },
+    { id: 4, text: 'Selling Guide', href: '/sell-guide' },
+    { id: 5, text: 'Payment', href: '/payment' },
+    { id: 6, text: 'Shipping', href: '/shipping' },
+    { id: 7, text: 'Returns & Refunds', href: '/returns' }
   ];
 
   const aboutLinks = [
-    { id: 1, text: 'Giới Thiệu Về ShopMart', href: '/about' },
-    { id: 2, text: 'Tuyển Dụng', href: '/careers' },
-    { id: 3, text: 'Điều Khoản ShopMart', href: '/terms' },
-    { id: 4, text: 'Chính Sách Bảo Mật', href: '/privacy' },
-    { id: 5, text: 'Chính Hãng', href: '/authentic' },
-    { id: 6, text: 'Kênh Người Bán', href: '/seller' },
+    { id: 1, text: 'About ShopMart', href: '/about' },
+    { id: 2, text: 'Careers', href: '/careers' },
+    { id: 3, text: 'ShopMart Terms', href: '/terms' },
+    { id: 4, text: 'Privacy Policy', href: '/privacy' },
+    { id: 5, text: 'Authenticity', href: '/authentic' },
+    { id: 6, text: 'Seller Channel', href: '/seller' },
     { id: 7, text: 'Flash Sales', href: '/flash-sales' }
   ];
 
   const categoriesLinks = [
-    { id: 1, text: 'Thời Trang Nam', href: '/men-fashion' },
-    { id: 2, text: 'Thời Trang Nữ', href: '/women-fashion' },
-    { id: 3, text: 'Điện Thoại & Phụ Kiện', href: '/phones' },
-    { id: 4, text: 'Máy Tính & Laptop', href: '/computers' },
-    { id: 5, text: 'Sắc Đẹp', href: '/beauty' },
-    { id: 6, text: 'Nhà Cửa & Đời Sống', href: '/home' },
-    { id: 7, text: 'Thể Thao & Du Lịch', href: '/sports' }
+    { id: 1, text: 'Men\'s Fashion', href: '/men-fashion' },
+    { id: 2, text: 'Women\'s Fashion', href: '/women-fashion' },
+    { id: 3, text: 'Phones & Accessories', href: '/phones' },
+    { id: 4, text: 'Computers & Laptops', href: '/computers' },
+    { id: 5, text: 'Beauty', href: '/beauty' },
+    { id: 6, text: 'Home & Living', href: '/home' },
+    { id: 7, text: 'Sports & Travel', href: '/sports' }
   ];
 
   return (
@@ -186,11 +186,11 @@ const Footer = () => {
               <span>ShopMart</span>
             </div>
             <p style={styles.tagline}>
-              Nền tảng thương mại điện tử hàng đầu Việt Nam. 
-              Mua sắm và bán hàng online đơn giản, nhanh chóng và an toàn.
+              The leading e-commerce platform in HCMUT. 
+              Shop and sell online easily, quickly, and safely.
             </p>
             <div style={styles.payment}>
-              <div style={styles.paymentTitle}>Thanh toán</div>
+              <div style={styles.paymentTitle}>Payment</div>
               <div style={styles.paymentIcons}>
                 <div style={styles.paymentIcon}>💳</div>
                 <div style={styles.paymentIcon}>🏦</div>
@@ -204,7 +204,7 @@ const Footer = () => {
           <div style={styles.linksSection}>
             {/* Customer Care Column */}
             <div style={styles.linkColumn}>
-              <h3 style={styles.columnTitle}>Chăm Sóc Khách Hàng</h3>
+              <h3 style={styles.columnTitle}>Customer Care</h3>
               <ul style={styles.linkList}>
                 {customerCareLinks.map((link) => (
                   <li key={link.id} style={styles.linkItem}>
@@ -226,7 +226,7 @@ const Footer = () => {
 
             {/* About Column */}
             <div style={styles.linkColumn}>
-              <h3 style={styles.columnTitle}>Về ShopMart</h3>
+              <h3 style={styles.columnTitle}>About ShopMart</h3>
               <ul style={styles.linkList}>
                 {aboutLinks.map((link) => (
                   <li key={link.id} style={styles.linkItem}>
@@ -248,7 +248,7 @@ const Footer = () => {
 
             {/* Categories Column */}
             <div style={styles.linkColumn}>
-              <h3 style={styles.columnTitle}>Danh Mục</h3>
+              <h3 style={styles.columnTitle}>Categories</h3>
               <ul style={styles.linkList}>
                 {categoriesLinks.map((link) => (
                   <li key={link.id} style={styles.linkItem}>

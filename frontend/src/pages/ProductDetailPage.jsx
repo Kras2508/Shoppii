@@ -69,9 +69,7 @@ const ProductDetailPage = () => {
     }
   }, [id]);
 
-  const avgRating = reviews.length > 0 
-    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) 
-    : 0;
+  const avgRating = product?.avg_rating || product?.rating;
 
   // Calculate rating distribution
   const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -136,7 +134,7 @@ const ProductDetailPage = () => {
   };
 
   const formatPrice = (price) => {
-    return ((price || 0) * 1000).toLocaleString('vi-VN') + ' VND';
+    return ((price || 0)).toLocaleString('vi-VN') + ' VND';
   };
 
   const handleQuantityChange = (action) => {
@@ -1072,7 +1070,7 @@ const ProductDetailPage = () => {
                       </div>
                     </div>
                     <div style={styles.reviewDate}>
-                      {new Date(review.created_at).toLocaleDateString('en-US')}
+                      {new Date(review.review_date).toLocaleDateString('en-US')}
                     </div>
                   </div>
 

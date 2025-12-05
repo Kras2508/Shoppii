@@ -46,7 +46,7 @@ export const getProducts = async (req, res) => {
         p.product_id,
         p.product_name,
         p.description,
-        p.image,
+        MAX(CASE WHEN pi.image_url IS NOT NULL THEN pi.image_url END) as image,
         p.status,
         p.created_at,
         p.shop_id,
@@ -158,7 +158,7 @@ export const getProductById = async (req, res) => {
         a.full_name as customer_name
       FROM Review r
       INNER JOIN Customer c ON r.customer_id = c.customer_id
-      INNER JOIN Account a ON c.account_id = a.account_id
+      INNER JOIN Account a ON c.customer_id = a.account_id
       WHERE r.target_type = 'Product' AND r.target_id = ?
       ORDER BY r.review_date DESC
       LIMIT 10
@@ -189,7 +189,7 @@ export const createProduct = async (req, res) => {
   
   try {
     const accountId = req.user.account_id;
-    const { category_id, product_name, description, image, variants } = req.body;
+    const { category_id, product_name, description, variants } = req.body;
 
     // Validate required fields
     if (!category_id || !product_name) {
@@ -201,7 +201,7 @@ export const createProduct = async (req, res) => {
 
     // Get shop_id from account
     const [shops] = await pool.query(
-      'SELECT shop_id FROM Shop WHERE account_id = ?',
+      'SELECT shop_id FROM Shop WHERE shop_id = ?',
       [accountId]
     );
 
@@ -216,11 +216,11 @@ export const createProduct = async (req, res) => {
 
     await connection.beginTransaction();
 
-    // Insert product
+    // Insert product (without image - store in variants instead)
     const [productResult] = await connection.query(`
-      INSERT INTO Product (shop_id, category_id, product_name, description, image)
-      VALUES (?, ?, ?, ?, ?)
-    `, [shopId, category_id, product_name, description || null, image || null]);
+      INSERT INTO Product (shop_id, category_id, product_name, description)
+      VALUES (?, ?, ?, ?)
+    `, [shopId, category_id, product_name, description || null]);
 
     const productId = productResult.insertId;
 
@@ -265,14 +265,16 @@ export const createProduct = async (req, res) => {
 
 // Update product (Shop only)
 export const updateProduct = async (req, res) => {
+  const connection = await pool.getConnection();
+  
   try {
     const accountId = req.user.account_id;
     const { id } = req.params;
-    const { category_id, product_name, description, image, status } = req.body;
+    const { category_id, product_name, description, status, variants } = req.body;
 
     // Get shop_id from account
     const [shops] = await pool.query(
-      'SELECT shop_id FROM Shop WHERE account_id = ?',
+      'SELECT shop_id FROM Shop WHERE shop_id = ?',
       [accountId]
     );
 
@@ -298,7 +300,9 @@ export const updateProduct = async (req, res) => {
       });
     }
 
-    // Build update query
+    await connection.beginTransaction();
+
+    // Update Product basic info
     const updateFields = [];
     const updateValues = [];
 
@@ -314,28 +318,44 @@ export const updateProduct = async (req, res) => {
       updateFields.push('description = ?');
       updateValues.push(description);
     }
-    if (image !== undefined) {
-      updateFields.push('image = ?');
-      updateValues.push(image);
-    }
     if (status) {
       updateFields.push('status = ?');
       updateValues.push(status);
     }
 
-    if (updateFields.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No fields to update'
-      });
+    if (updateFields.length > 0) {
+      updateValues.push(id);
+      await connection.query(
+        `UPDATE Product SET ${updateFields.join(', ')} WHERE product_id = ?`,
+        updateValues
+      );
     }
 
-    updateValues.push(id);
+    // Update variants if provided
+    if (variants && variants.length > 0) {
+      // Delete old variants
+      await connection.query('DELETE FROM ProductItem WHERE product_id = ?', [id]);
+      
+      // Insert new variants
+      for (const variant of variants) {
+        if (variant.color && variant.type && variant.price !== undefined && variant.stock !== undefined) {
+          await connection.query(`
+            INSERT INTO ProductItem (product_id, shop_id, color, type, price, stock, image_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `, [
+            id,
+            shopId,
+            variant.color || 'Default',
+            variant.type || 'Standard',
+            variant.price,
+            variant.stock,
+            variant.image_url || null
+          ]);
+        }
+      }
+    }
 
-    await pool.query(
-      `UPDATE Product SET ${updateFields.join(', ')} WHERE product_id = ?`,
-      updateValues
-    );
+    await connection.commit();
 
     res.json({
       success: true,
@@ -343,12 +363,15 @@ export const updateProduct = async (req, res) => {
     });
 
   } catch (error) {
+    await connection.rollback();
     console.error('Update product error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update product',
       error: error.message
     });
+  } finally {
+    connection.release();
   }
 };
 
@@ -362,7 +385,7 @@ export const deleteProduct = async (req, res) => {
 
     // Get shop_id from account
     const [shops] = await pool.query(
-      'SELECT shop_id FROM Shop WHERE account_id = ?',
+      'SELECT shop_id FROM Shop WHERE shop_id = ?',
       [accountId]
     );
 
@@ -428,7 +451,7 @@ export const upsertVariant = async (req, res) => {
 
     // Get shop_id from account
     const [shops] = await pool.query(
-      'SELECT shop_id FROM Shop WHERE account_id = ?',
+      'SELECT shop_id FROM Shop WHERE shop_id = ?',
       [accountId]
     );
 
@@ -498,7 +521,7 @@ export const deleteVariant = async (req, res) => {
 
     // Get shop_id from account
     const [shops] = await pool.query(
-      'SELECT shop_id FROM Shop WHERE account_id = ?',
+      'SELECT shop_id FROM Shop WHERE shop_id = ?',
       [accountId]
     );
 
@@ -548,7 +571,7 @@ export const getShopProducts = async (req, res) => {
 
     // Get shop_id from account
     const [shops] = await pool.query(
-      'SELECT shop_id FROM Shop WHERE account_id = ?',
+      'SELECT shop_id FROM Shop WHERE shop_id = ?',
       [accountId]
     );
 
@@ -583,11 +606,12 @@ export const getShopProducts = async (req, res) => {
         SUM(pi.stock) as total_stock,
         COUNT(DISTINCT pi.item_id) as variant_count,
         COALESCE(SUM(oi.quantity), 0) as total_sold,
-        COALESCE(AVG(r.rating), 0) as avg_rating
+        COALESCE(AVG(r.rating), 0) as avg_rating,
+        MAX(CASE WHEN pi.image_url IS NOT NULL THEN pi.image_url END) as image
       FROM Product p
       INNER JOIN Category c ON p.category_id = c.category_id
       LEFT JOIN ProductItem pi ON p.product_id = pi.product_id
-      LEFT JOIN OrderItem oi ON pi.item_id = oi.variantID
+      LEFT JOIN OrderItem oi ON pi.item_id = oi.item_id
       LEFT JOIN Review r ON p.product_id = r.target_id AND r.target_type = 'Product'
       ${whereClause}
       GROUP BY p.product_id
@@ -655,3 +679,5 @@ export const getProductStatistics = async (req, res) => {
     });
   }
 };
+
+

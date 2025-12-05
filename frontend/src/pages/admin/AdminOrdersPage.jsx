@@ -1,87 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import adminStyles from './adminStyles.js';
+import { adminService } from '../../api/adminService.js';
 import Modal from '../../components/common/Modal';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
+import createPrivateClient from '../../clients/private.client';
 
 const AdminOrdersPage = () => {
+  const { token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data
-  const orders = [
-    {
-      id: 1, order_id: 'ORD001', customer_name: 'Nguyễn Văn A', customer_email: 'nguyenvana@gmail.com',
-      shop_name: 'Fashion House', total: 1590000, status: 'Delivered', created_at: '2024-04-20 14:30',
-      items: [
-        { name: 'Áo thun nam basic', quantity: 2, price: 299000 },
-        { name: 'Quần jean slim fit', quantity: 1, price: 599000 }
-      ],
-      shipping_address: '123 Nguyễn Huệ, Q.1, TP.HCM', payment_method: 'COD'
-    },
-    {
-      id: 2, order_id: 'ORD002', customer_name: 'Trần Thị B', customer_email: 'tranthib@gmail.com',
-      shop_name: 'Tech World', total: 34990000, status: 'Shipped', created_at: '2024-04-21 09:15',
-      items: [
-        { name: 'iPhone 15 Pro Max 256GB', quantity: 1, price: 34990000 }
-      ],
-      shipping_address: '456 Lê Lợi, Q.1, TP.HCM', payment_method: 'Banking'
-    },
-    {
-      id: 3, order_id: 'ORD003', customer_name: 'Lê Minh C', customer_email: 'leminhc@gmail.com',
-      shop_name: 'Beauty Corner', total: 1100000, status: 'Confirmed', created_at: '2024-04-21 11:45',
-      items: [
-        { name: 'Son môi MAC Ruby Woo', quantity: 1, price: 650000 },
-        { name: 'Kem chống nắng Anessa', quantity: 1, price: 450000 }
-      ],
-      shipping_address: '789 Trần Hưng Đạo, Q.5, TP.HCM', payment_method: 'E-Wallet'
-    },
-    {
-      id: 4, order_id: 'ORD004', customer_name: 'Phạm Văn D', customer_email: 'phamvand@gmail.com',
-      shop_name: 'Sports Zone', total: 2890000, status: 'Pending', created_at: '2024-04-22 08:00',
-      items: [
-        { name: 'Giày Nike Air Max', quantity: 1, price: 2890000 }
-      ],
-      shipping_address: '321 Võ Văn Tần, Q.3, TP.HCM', payment_method: 'COD'
-    },
-    {
-      id: 5, order_id: 'ORD005', customer_name: 'Hoàng E', customer_email: 'hoange@gmail.com',
-      shop_name: 'Home & Living', total: 3980000, status: 'Cancelled', created_at: '2024-04-19 16:20',
-      items: [
-        { name: 'Bàn làm việc gỗ', quantity: 2, price: 1990000 }
-      ],
-      shipping_address: '654 Hai Bà Trưng, Q.1, TP.HCM', payment_method: 'Banking',
-      cancel_reason: 'Khách hủy đơn'
-    },
-    {
-      id: 6, order_id: 'ORD006', customer_name: 'Vũ Thị F', customer_email: 'vuthif@gmail.com',
-      shop_name: 'Fashion House', total: 897000, status: 'Delivered', created_at: '2024-04-18 10:30',
-      items: [
-        { name: 'Áo thun nam basic', quantity: 3, price: 299000 }
-      ],
-      shipping_address: '987 Nguyễn Thị Minh Khai, Q.3, TP.HCM', payment_method: 'COD'
-    },
-    {
-      id: 7, order_id: 'ORD007', customer_name: 'Nguyễn Văn G', customer_email: 'nguyenvang@gmail.com',
-      shop_name: 'Tech World', total: 8990000, status: 'Refunded', created_at: '2024-04-17 14:00',
-      items: [
-        { name: 'Tai nghe Sony WH-1000XM5', quantity: 1, price: 8990000 }
-      ],
-      shipping_address: '147 Đinh Tiên Hoàng, Q.Bình Thạnh, TP.HCM', payment_method: 'Banking',
-      refund_reason: 'Sản phẩm lỗi'
-    },
-    {
-      id: 8, order_id: 'ORD008', customer_name: 'Trần Văn H', customer_email: 'tranvanh@gmail.com',
-      shop_name: 'Beauty Corner', total: 650000, status: 'Shipped', created_at: '2024-04-22 07:30',
-      items: [
-        { name: 'Son môi MAC Ruby Woo', quantity: 1, price: 650000 }
-      ],
-      shipping_address: '258 Cách Mạng Tháng 8, Q.10, TP.HCM', payment_method: 'E-Wallet'
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        const response = await adminService.getAllOrders(privateClient, {
+          search: searchTerm || undefined
+        });
+        if (response.data?.data?.orders) {
+          setOrders(response.data.data.orders);
+        }
+      } catch (err) {
+        console.error('Error fetching orders:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchOrders();
     }
-  ];
+  }, [token, searchTerm]);
 
   const filteredOrders = orders.filter(order => {
     const matchSearch = 
@@ -151,6 +109,28 @@ const AdminOrdersPage = () => {
     shipped: orders.filter(o => o.status === 'Shipped').length,
     delivered: orders.filter(o => o.status === 'Delivered').length,
     cancelled: orders.filter(o => o.status === 'Cancelled' || o.status === 'Refunded').length
+  };
+
+  const handleUpdateStatus = async (newStatus) => {
+    if (!selectedOrder) return;
+    try {
+      const response = await privateClient.put(`/orders/${selectedOrder.order_id}/status`, {
+        status: newStatus
+      });
+      if (response.data?.success) {
+        // Update local state
+        setOrders(orders.map(o => 
+          o.order_id === selectedOrder.order_id 
+            ? { ...o, status: newStatus }
+            : o
+        ));
+        setSelectedOrder({ ...selectedOrder, status: newStatus });
+        console.log('Order status updated:', newStatus);
+      }
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      alert('Lỗi: ' + (error.response?.data?.message || error.message));
+    }
   };
 
   return (
@@ -306,7 +286,34 @@ const AdminOrdersPage = () => {
           title={`Chi tiết Đơn hàng #${selectedOrder.order_id}`}
           size="large"
           footer={
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {selectedOrder.status !== 'Pending' && (
+                  <Button variant="outline" size="small" onClick={() => handleUpdateStatus('Pending')}>
+                    → Chờ xử lý
+                  </Button>
+                )}
+                {selectedOrder.status !== 'Confirmed' && (
+                  <Button variant="outline" size="small" onClick={() => handleUpdateStatus('Confirmed')}>
+                    ✓ Xác nhận
+                  </Button>
+                )}
+                {selectedOrder.status !== 'Shipped' && (
+                  <Button variant="outline" size="small" onClick={() => handleUpdateStatus('Shipped')}>
+                    🚚 Đang giao
+                  </Button>
+                )}
+                {selectedOrder.status !== 'Delivered' && (
+                  <Button variant="outline" size="small" onClick={() => handleUpdateStatus('Delivered')}>
+                    📦 Đã giao
+                  </Button>
+                )}
+                {selectedOrder.status !== 'Cancelled' && (
+                  <Button variant="danger" size="small" onClick={() => handleUpdateStatus('Cancelled')}>
+                    ✕ Hủy
+                  </Button>
+                )}
+              </div>
               <Button variant="outline" onClick={() => setShowModal(false)}>
                 Đóng
               </Button>

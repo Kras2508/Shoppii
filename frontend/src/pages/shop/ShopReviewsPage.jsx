@@ -20,32 +20,33 @@ const ShopReviewsPage = () => {
     const fetchReviews = async () => {
       try {
         setLoading(true);
-        const params = { target_type: 'Product' };
+        const params = {};
         if (filterRating !== 'all') {
           params.rating = filterRating;
         }
-        const response = await reviewService.getReviews(params);
+        const response = await reviewService.getShopReviews(privateClient, params);
         if (response.data?.data?.reviews) {
           setReviews(response.data.data.reviews.map(r => ({
-            id: r.review_id,
-            order_id: r.order_id,
+            review_id: r.review_id,
+            customer_id: r.customer_id,
+            target_type: r.target_type,
             product_id: r.target_id,
-            product_name: r.product_name || 'Sản phẩm',
-            product_image: r.product_image || 'https://via.placeholder.com/100',
-            customer_name: r.customer_name || 'Khách hàng',
+            product_name: r.product_name || 'Product',
+            product_image: r.product_image || null,
+            customer_name: r.customer_name || 'Customer',
             customer_avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.customer_id}`,
             rating: r.rating,
             comment: r.comment,
-            images: r.images || [],
-            created_at: new Date(r.created_at).toLocaleDateString('vi-VN'),
-            replied: !!r.reply,
-            reply: r.reply || '',
-            reply_date: r.reply_date ? new Date(r.reply_date).toLocaleDateString('vi-VN') : null
+            images: r.image_url ? [r.image_url] : [],
+            created_at: new Date(r.review_date).toLocaleDateString('vi-VN'),
+            replied: false,
+            reply: '',
+            reply_date: null
           })));
         }
       } catch (err) {
         console.error('Error fetching reviews:', err);
-        setError('Không thể tải danh sách đánh giá');
+        setError('Cannot load reviews');
       } finally {
         setLoading(false);
       }
@@ -117,7 +118,9 @@ const ShopReviewsPage = () => {
     filterBtn: {
       padding: '8px 14px',
       fontSize: '13px',
-      border: '1px solid #ddd',
+      borderWidth: '1px',
+      borderStyle: 'solid',
+      borderColor: '#ddd',
       borderRadius: '20px',
       backgroundColor: 'white',
       cursor: 'pointer',
@@ -385,37 +388,37 @@ const ShopReviewsPage = () => {
       <div style={styles.container}>
         {/* Header */}
         <div style={styles.pageHeader}>
-          <h1 style={styles.pageTitle}>⭐ Đánh giá từ khách hàng</h1>
+          <h1 style={styles.pageTitle}>⭐ Review from Customers</h1>
         </div>
 
         {/* Stats */}
         <div style={styles.statsRow}>
           <div style={styles.statBox}>
             <div style={styles.statNumber}>{stats.total}</div>
-            <div style={styles.statLabel}>Tổng đánh giá</div>
+            <div style={styles.statLabel}>Total Reviews</div>
           </div>
           <div style={styles.statBox}>
             <div style={{ ...styles.statNumber, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
               {stats.average} <span style={{ fontSize: '20px', color: '#FFD700' }}>★</span>
             </div>
-            <div style={styles.statLabel}>Điểm trung bình</div>
+            <div style={styles.statLabel}>Average Rating</div>
           </div>
           <div style={styles.statBox}>
             <div style={{ ...styles.statNumber, color: '#e67e22' }}>{stats.pending}</div>
-            <div style={styles.statLabel}>Chờ phản hồi</div>
+            <div style={styles.statLabel}>Pending Replies</div>
           </div>
           <div style={styles.statBox}>
             <div style={{ ...styles.statNumber, color: '#27ae60' }}>{stats.replied}</div>
-            <div style={styles.statLabel}>Đã phản hồi</div>
+            <div style={styles.statLabel}>Replied</div>
           </div>
         </div>
 
         {/* Rating Distribution */}
         <div style={{ ...styles.card, marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>📊 Phân bố đánh giá</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Rating Distribution</h3>
           {[5, 4, 3, 2, 1].map(rating => (
             <div key={rating} style={styles.ratingBar}>
-              <span style={styles.ratingLabel}>{rating} sao</span>
+              <span style={styles.ratingLabel}>{rating} stars</span>
               <div style={styles.ratingProgress}>
                 <div style={{ 
                   ...styles.ratingFill, 
@@ -431,14 +434,14 @@ const ShopReviewsPage = () => {
         <div style={styles.filterBar}>
           <input
             type="text"
-            placeholder="🔍 Tìm theo sản phẩm, khách hàng..."
+            placeholder="Search by product, customer..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={styles.searchInput}
           />
           
           <div style={styles.filterGroup}>
-            <span style={styles.filterLabel}>Sao:</span>
+            <span style={styles.filterLabel}>Stars:</span>
             {['all', '5', '4', '3', '2', '1'].map(rating => (
               <button
                 key={rating}
@@ -448,17 +451,17 @@ const ShopReviewsPage = () => {
                 }}
                 onClick={() => setFilterRating(rating)}
               >
-                {rating === 'all' ? 'Tất cả' : `${rating}★`}
+                {rating === 'all' ? 'All' : `${rating}★`}
               </button>
             ))}
           </div>
 
           <div style={styles.filterGroup}>
-            <span style={styles.filterLabel}>Trạng thái:</span>
+            <span style={styles.filterLabel}>Status:</span>
             {[
-              { value: 'all', label: 'Tất cả' },
-              { value: 'pending', label: '⏳ Chờ phản hồi' },
-              { value: 'replied', label: '✓ Đã phản hồi' }
+              { value: 'all', label: 'All' },
+              { value: 'pending', label: '⏳ Pending Replies' },
+              { value: 'replied', label: '✓ Replied' }
             ].map(status => (
               <button
                 key={status.value}
@@ -478,11 +481,11 @@ const ShopReviewsPage = () => {
         {filteredReviews.length === 0 ? (
           <div style={{ ...styles.card, textAlign: 'center', padding: '60px 20px' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>📝</div>
-            <div style={{ fontSize: '16px', color: '#666' }}>Không có đánh giá nào phù hợp</div>
+            <div style={{ fontSize: '16px', color: '#666' }}>No reviews found</div>
           </div>
         ) : (
           filteredReviews.map(review => (
-            <div key={review.id} style={styles.reviewCard}>
+            <div key={review.review_id} style={styles.reviewCard}>
               {/* Header */}
               <div style={styles.reviewHeader}>
                 <div style={styles.customerInfo}>
@@ -495,19 +498,18 @@ const ShopReviewsPage = () => {
                 <div style={{ textAlign: 'right' }}>
                   <div style={styles.reviewDate}>{review.created_at}</div>
                   {review.replied ? (
-                    <span style={styles.repliedBadge}>✓ Đã phản hồi</span>
+                    <span style={styles.repliedBadge}>✓ Has replied</span>
                   ) : (
-                    <span style={styles.pendingBadge}>⏳ Chờ phản hồi</span>
+                    <span style={styles.pendingBadge}>⏳ Pending reply</span>
                   )}
                 </div>
               </div>
 
               {/* Product Info */}
               <div style={styles.productInfo}>
-                <img src={review.product_image} alt="" style={styles.productImage} />
                 <div>
                   <div style={styles.productName}>{review.product_name}</div>
-                  <div style={styles.orderId}>Đơn hàng: #{review.order_id}</div>
+                  <div style={styles.orderId}>Order: #{review.product_id}</div>
                 </div>
               </div>
 
@@ -515,7 +517,7 @@ const ShopReviewsPage = () => {
               <div style={styles.reviewComment}>{review.comment}</div>
 
               {/* Images */}
-              {review.images.length > 0 && (
+              {review.images && review.images.length > 0 && (
                 <div style={styles.reviewImages}>
                   {review.images.map((img, idx) => (
                     <img 
@@ -535,10 +537,10 @@ const ShopReviewsPage = () => {
               {review.replied && (
                 <div style={styles.replySection}>
                   <div style={styles.replyHeader}>
-                    <span>🏪</span> Phản hồi của Shop
+                    <span>🏪</span> Shops Replies
                   </div>
                   <div style={styles.replyText}>{review.reply}</div>
-                  <div style={styles.replyDate}>Đã phản hồi: {review.reply_date}</div>
+                  <div style={styles.replyDate}>Replied on: {review.reply_date}</div>
                 </div>
               )}
 
@@ -555,14 +557,14 @@ const ShopReviewsPage = () => {
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#556B5A'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = '#647A67'}
                 >
-                  💬 Phản hồi
+                  Reply
                 </button>
               )}
 
               {replyingTo === review.id && (
                 <div style={styles.replyForm}>
                   <textarea
-                    placeholder="Nhập phản hồi của bạn..."
+                    placeholder="Enter your reply..."
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     style={styles.replyTextarea}
@@ -579,7 +581,7 @@ const ShopReviewsPage = () => {
                         setReplyText('');
                       }}
                     >
-                      Hủy
+                      Cancel
                     </button>
                     <button
                       style={{
@@ -591,7 +593,7 @@ const ShopReviewsPage = () => {
                       onMouseEnter={(e) => e.target.style.backgroundColor = '#556B5A'}
                       onMouseLeave={(e) => e.target.style.backgroundColor = '#647A67'}
                     >
-                      Gửi phản hồi
+                      Send Reply
                     </button>
                   </div>
                 </div>

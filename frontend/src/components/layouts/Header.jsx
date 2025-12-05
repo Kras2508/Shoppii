@@ -12,6 +12,19 @@ const Header = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      navigate(`/products?search=${encodeURIComponent(searchQuery)}`);
+      setSearchQuery('');
+    }
+  };
+
+  const handleSearchKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
   const styles = {
     // Top Bar (Notifications & Links)
     topBar: {
@@ -193,10 +206,11 @@ const Header = () => {
             <div style={styles.searchBar}>
               <input
                 type="text"
-                placeholder="Tìm kiếm sản phẩm, danh mục hoặc thương hiệu..."
+                placeholder="Find products, brands and more"
                 style={styles.searchInput}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={handleSearchKeyPress}
               />
               <button
                 style={{
@@ -205,6 +219,7 @@ const Header = () => {
                 }}
                 onMouseEnter={() => setHoveredItem('search')}
                 onMouseLeave={() => setHoveredItem(null)}
+                onClick={handleSearch}
               >
                 Search
               </button>
@@ -224,7 +239,6 @@ const Header = () => {
               onMouseLeave={() => setHoveredItem(null)}
             >
               🛒
-              <span style={styles.cartBadge}>3</span>
             </Link>
             
             {/* User Section - Show Sign In button or Avatar */}
@@ -298,7 +312,7 @@ const Header = () => {
                           setShowUserMenu(false);
                         }}
                         >
-                          <span>👤</span> Hồ sơ của tôi
+                          <span>👤</span> My profile
                         </div>
                         <div style={{
                           padding: '12px 16px',
@@ -316,26 +330,7 @@ const Header = () => {
                           setShowUserMenu(false);
                         }}
                         >
-                          <span>📦</span> Đơn hàng của tôi
-                        </div>
-                        <div style={{
-                          padding: '12px 16px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          transition: 'background 0.2s',
-                          borderTop: '1px solid #eee'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                        onClick={() => {
-                          navigate('/shop');
-                          setShowUserMenu(false);
-                        }}
-                        >
-                          <span>🏪</span> Kênh người bán
+                          <span>📦</span> My orders
                         </div>
                         <div style={{
                           padding: '12px 16px',
@@ -356,7 +351,7 @@ const Header = () => {
                           navigate('/');
                         }}
                         >
-                          <span>🚪</span> Đăng xuất
+                          <span>🚪</span> Sign out
                         </div>
                       </div>
                     </div>

@@ -1,6 +1,54 @@
 USE ecommerce_db;
 
 -- ==========================
+-- DATA SUMMARY
+-- ==========================
+-- ACCOUNTS (7 total):
+--   ID 1: Nguyen Van A (Customer) - c1@gmail.com
+--   ID 2: Tran Thi B (Customer) - c2@gmail.com  
+--   ID 3: Le Hoai C (Customer) - c3@gmail.com
+--   ID 4: Shop ABC (Shop) - s1@gmail.com
+--   ID 5: Shop XYZ (Shop) - s2@gmail.com
+--   ID 6: Tech Store (Shop) - s3@gmail.com
+--   ID 7: Admin Core (Admin) - admin1@gmail.com
+--
+-- SHOPS (3 total):
+--   Shop 4 (Shop ABC): Products 1,2 | Orders from Customer 1,2
+--   Shop 5 (Shop XYZ): Product 3 | No orders yet
+--   Shop 6 (Tech Store): Products 4,5 | Orders from Customer 1,3
+--
+-- PRODUCTS (5 total):
+--   Product 1: iPhone 14 (Shop 4) - Items 1,2 (Red 128GB, Blue 256GB)
+--   Product 2: Samsung Galaxy S22 (Shop 4) - Item 3 (Black 128GB)
+--   Product 3: T-Shirt Premium (Shop 5) - Item 4 (White Size M)
+--   Product 4: Macbook Air M2 (Shop 6) - Item 5 (Silver 16GB RAM)
+--   Product 5: Wireless Headset (Shop 6) - Item 6 (Black Standard)
+--
+-- ORDERS (4 total):
+--   Order 1: Customer 1 → Items 1,2 (Shop 4) - Processing - 1,985,000 VND
+--   Order 2: Customer 2 → Item 3 (Shop 4) - Cancelled - 904,000 VND
+--   Order 3: Customer 3 → Item 5 (Shop 6) - Delivered - 1,156,000 VND
+--   Order 4: Customer 1 → Item 6 (Shop 6) - Shipped - 84,500 VND
+--
+-- REVIEWS (5 total):
+--   Review 1: Customer 1 → Product 1 (iPhone) - 5★
+--   Review 2: Customer 2 → Product 3 (T-Shirt) - 4★
+--   Review 3: Customer 1 → Shop 4 (Shop ABC) - 5★
+--   Review 4: Customer 3 → Shop 6 (Tech Store) - 5★
+--   Review 5: Customer 2 → Product 4 (Macbook) - 5★
+--
+-- CUSTOMER STATS:
+--   Customer 1: 2 orders (2,069,500 VND) - Orders 1,4
+--   Customer 2: 1 order cancelled (0 VND) - Order 2
+--   Customer 3: 1 order (1,156,000 VND) - Order 3
+--
+-- SHOP STATS:
+--   Shop 4: 2 products, 3 items, 2 orders (1 cancelled), 2 reviews
+--   Shop 5: 1 product, 1 item, 0 orders, 1 review (for product)
+--   Shop 6: 2 products, 2 items, 2 orders, 2 reviews (1 shop, 1 product)
+-- ==========================
+
+-- ==========================
 -- 1. ACCOUNT
 -- ==========================
 INSERT INTO Account (email, password, role, full_name, phone, status)
@@ -18,9 +66,9 @@ VALUES
 -- ==========================
 INSERT INTO Customer (customer_id, address, add_phone)
 VALUES
- (1,'123 HCM Street','0908888888'),
- (2,'456 HCM Street','0909999999'),
- (3,'789 Ha Noi Street','0911111111');
+ (1,'123 HCM Street','0908888888'), -- Order 1 (1,985,000) + Order 4 (84,500)
+ (2,'456 HCM Street','0909999999'), -- Order 2 (Cancelled, không tính)
+ (3,'789 Ha Noi Street','0911111111'); -- Order 3
 
 -- ==========================
 -- 3. SHOP (shop_id = account_id)
@@ -65,12 +113,12 @@ VALUES
 -- ==========================
 INSERT INTO ProductItem (product_id, shop_id, color, type, price, stock, image_url)
 VALUES
- (1,4,'Red','128GB',1000,50,'https://images.unsplash.com/photo-1678685888221-cda773a3dcdb?w=400'),
- (1,4,'Blue','256GB',1200,30,'https://images.unsplash.com/photo-1664472252707-5ded875aaffe?q=80&w=735&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'),
- (2,4,'Black','128GB',900,20,'https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=400'),
- (3,5,'White','Size M',25,100,'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400'),
- (4,6,'Silver','16GB RAM',1200,15,'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400'),
- (5,6,'Black','Standard',80,60,'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400');
+ (1,4,'Red','128GB',1000000,50,'https://images.unsplash.com/photo-1678685888221-cda773a3dcdb?w=400'),
+ (1,4,'Blue','256GB',1200000,30,'https://images.unsplash.com/photo-1664472252707-5ded875aaffe?q=80&w=735&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'),
+ (2,4,'Black','128GB',900000,20,'https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=400'),
+ (3,5,'White','Size M',25000,100,'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400'),
+ (4,6,'Silver','16GB RAM',1200000,15,'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400'),
+ (5,6,'Black','Standard',80000,60,'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400');
 
 -- ==========================
 -- 7. CART
@@ -94,42 +142,42 @@ VALUES
 -- ==========================
 INSERT INTO Shipping (name, estimated_days, fee, status)
 VALUES
- ('GHN',2,5,'Active'),
- ('J&T',3,4,'Active'),
- ('Shopee Express',1,6,'Active'),
- ('Ninja Van',4,4.5,'Active');
+ ('GHN',2,5000,'Active'),
+ ('J&T',3,4000,'Active'),
+ ('Shopee Express',1,6000,'Active'),
+ ('Ninja Van',4,4500,'Active');
 
 -- ==========================
 -- 10. VOUCHER
 -- ==========================
-INSERT INTO Voucher (discount_type, discount_value, min_order_value, expired_date, usage_limit, status)
+INSERT INTO Voucher (code, discount_type, discount_value, min_order_value, expired_date, usage_limit, status)
 VALUES
- ('Percentage',10,100,'2025-12-31',10,'Active'),
- ('Amount',50,200,'2025-12-31',10,'Active'),
- ('Percentage',5,50,'2026-01-01',20,'Active'),
- ('Amount',100,300,'2025-11-30',5,'Expired');
+ ('DISCOUNT10','Percentage',10,100,'2025-12-31',10,'Active'),
+ ('SAVE50','Amount',50000,200,'2025-12-31',10,'Active'),
+ ('NEWYEAR5','Percentage',5,50,'2026-01-01',20,'Active'),
+ ('EXPIRED100','Amount',100,300000,'2025-11-30',5,'Expired');
 
 -- ==========================
 -- 11. ORDER
 -- ==========================
-INSERT INTO `Order` (customer_id, shipping_id, voucher_id, status, shipping_address, total_amount, payment_method)
+-- Note: total_amount = subtotal + shipping_fee - voucher_discount
+INSERT INTO `Order` (customer_id, shipping_id, voucher_id, status, shipping_address, payment_method, note)
 VALUES
- (1,1,1,'Processing','123 HCM Street',1100,'Cash'),
- (2,2,NULL,'Cancelled','456 HCM Street',900,'Bank Transfer'),
- (3,3,2,'Delivered','789 Ha Noi Street',1300,'Credit Card'),
- (1,4,NULL,'Shipped','123 HCM Street',80,'Momo');
+ (1,1,1,'Processing','123 HCM Street','COD','Please call before delivery'), -- (1000000 + 1200000) + 5000 - 220000 (10% voucher)
+ (2,2,NULL,'Cancelled','456 HCM Street','Banking',NULL), -- 900000 + 4000 (shipping)
+ (3,3,2,'Delivered','789 Ha Noi Street','Momo','Leave at the door'), -- 1200000 + 6000 (shipping) - 50000 (voucher)
+ (1,4,NULL,'Shipped','123 HCM Street','ZaloPay',NULL); -- 80000 + 4500 (shipping)
 
 -- ==========================
 -- 12. ORDER ITEM (item_id thay vì variantID)
 -- ==========================
 INSERT INTO OrderItem (order_id, item_id, shop_id, quantity, price_at_purchase)
 VALUES
- (1,1,4,1,1000),
- (1,2,4,1,1200),
- (2,3,4,1,900),
- (3,4,6,1,1200),
- (4,6,6,1,80);
-
+ (1,1,4,1,1000000),
+ (1,2,4,1,1200000),
+ (2,3,4,1,900000),
+ (3,4,6,1,1200000),
+ (4,6,6,1,80000);
 -- ==========================
 -- 13. REVIEW
 -- ==========================

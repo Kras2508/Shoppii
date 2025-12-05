@@ -4,7 +4,7 @@ const CheckoutProductsSection = ({ groupedByShop, styles, formatPrice }) => {
   return (
     <div style={styles.section}>
       <h2 style={styles.sectionTitle}>
-        <span>📦</span> Sản Phẩm
+        <span>📦</span> Products
       </h2>
       {Object.values(groupedByShop).map(({ shop, items }) => (
         <div key={shop.shop_id} style={styles.shopGroup}>
@@ -21,7 +21,7 @@ const CheckoutProductsSection = ({ groupedByShop, styles, formatPrice }) => {
               <div style={styles.productInfo}>
                 <div style={styles.productName}>{item.product_name}</div>
                 <div style={styles.productVariant}>
-                  Phân loại: {item.color}{item.type ? `, ${item.type}` : ''}
+                  Variant: {item.color}{item.type ? `, ${item.type}` : ''}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={styles.productPrice}>{formatPrice(item.price)}</span>

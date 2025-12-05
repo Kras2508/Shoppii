@@ -6,16 +6,18 @@ import OrderDetailProducts from './order/OrderDetailProducts';
 import OrderDetailSummary from './order/OrderDetailSummary';
 import orderDetailStyles from './order/orderDetailStyles';
 import { orderService } from '../api/orderService';
+import createPrivateClient from '../clients/private.client';
 
 const OrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated } = useSelector(state => state.auth);
+  const { isAuthenticated, token } = useSelector(state => state.auth);
+  const privateClient = createPrivateClient(token);
 
-  // Get order from navigation state or fetch
-  const [order, setOrder] = useState(location.state?.order || null);
-  const [loading, setLoading] = useState(!order);
+  // Always fetch order from API to get full data (customer_name, customer_phone from Account)
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -24,12 +26,12 @@ const OrderDetailPage = () => {
       return;
     }
 
-    if (!order && id) {
-      // Fetch order by ID from API
+    if (id) {
+      // Fetch order by ID from API to get full data with Account info
       const fetchOrder = async () => {
         try {
           setLoading(true);
-          const response = await orderService.getOrderById(id);
+          const response = await orderService.getOrderById(id, privateClient);
           if (response.data?.data) {
             setOrder(response.data.data);
           } else {
@@ -44,7 +46,7 @@ const OrderDetailPage = () => {
       };
       fetchOrder();
     }
-  }, [id, order, isAuthenticated, navigate]);
+  }, [id, isAuthenticated]);
 
   const formatPrice = (price) => {
     const value = Number(price ?? 0);
@@ -90,7 +92,7 @@ const OrderDetailPage = () => {
   const handleCancelOrder = async () => {
     if (window.confirm('Are you sure you want to cancel this order?')) {
       try {
-        await orderService.cancelOrder(order.order_id);
+        await orderService.cancelOrder(order.order_id, privateClient);
         alert('Order has been successfully cancelled!');
         setOrder(prev => ({ ...prev, status: 'Cancelled' }));
       } catch (err) {
@@ -190,13 +192,13 @@ const OrderDetailPage = () => {
             <div style={orderDetailStyles.infoRow}>
               <span style={orderDetailStyles.infoLabel}>Recipient</span>
               <span style={orderDetailStyles.infoValue}>
-                {order.customer_name || order.receiver_name || 'Customer'}
+                {order.customer_name}
               </span>
             </div>
             <div style={orderDetailStyles.infoRow}>
               <span style={orderDetailStyles.infoLabel}>Phone Number</span>
               <span style={orderDetailStyles.infoValue}>
-                {order.phone || order.receiver_phone || '0901234567'}
+                {order.customer_phone}
               </span>
             </div>
             <div style={orderDetailStyles.infoRow}>
@@ -208,7 +210,7 @@ const OrderDetailPage = () => {
             <div style={{ ...orderDetailStyles.infoRow, ...orderDetailStyles.infoRowLast }}>
               <span style={orderDetailStyles.infoLabel}>Method</span>
               <span style={orderDetailStyles.infoValue}>
-                {order.shipping_method?.name || order.shipping?.name || 'Standard Shipping'}
+                {order.shipping_name}
               </span>
             </div>
           </div>
@@ -218,19 +220,10 @@ const OrderDetailPage = () => {
             <h3 style={orderDetailStyles.cardTitle}>
               Payment
             </h3>
-            <div style={orderDetailStyles.infoRow}>
+            <div style={{ ...orderDetailStyles.infoRow, ...orderDetailStyles.infoRowLast }}>
               <span style={orderDetailStyles.infoLabel}>Method</span>
               <span style={orderDetailStyles.infoValue}>
                 {getPaymentMethodText(order.payment_method)}
-              </span>
-            </div>
-            <div style={{ ...orderDetailStyles.infoRow, ...orderDetailStyles.infoRowLast }}>
-              <span style={orderDetailStyles.infoLabel}>Status</span>
-              <span style={{
-                ...orderDetailStyles.infoValue,
-                color: order.status === 'Delivered' ? '#28a745' : '#856404'
-              }}>
-                {order.status === 'Delivered' ? ' Paid' : 'Pending Payment'}
               </span>
             </div>
           </div>

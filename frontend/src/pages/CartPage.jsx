@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { CartShopGroup, CartCheckoutFooter, EmptyCart } from './cart';
 import cartStyles from './cart/cartStyles';
 import { fetchCart } from '../redux/slice/cart.slice.js';
+import { cartService } from '../api/cartService.js';
 import createPrivateClient from '../clients/private.client.js';
 
 const CartPage = () => {
@@ -101,9 +102,20 @@ const CartPage = () => {
     setSelectedItems(newSet);
   };
 
-  const handleRemoveItem = (itemId) => {
-    // This will need to be handled via API
-    console.log('Remove item:', itemId);
+  const handleRemoveItem = async (itemId) => {
+    try {
+      if (!privateClient) return;
+      await cartService.removeFromCart(itemId, privateClient);
+      // Refresh cart after removing item
+      dispatchRedux(fetchCart(privateClient));
+      // Also remove from selected items
+      const newSet = new Set(selectedItems);
+      newSet.delete(itemId);
+      setSelectedItems(newSet);
+    } catch (err) {
+      console.error('Error removing item:', err);
+      alert('Failed to remove item from cart');
+    }
   };
 
   const handleCheckout = () => {
