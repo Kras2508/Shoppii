@@ -13,7 +13,7 @@ USE ecommerce_db;
 --   ID 7: Admin Core (Admin) - admin1@gmail.com
 --
 -- SHOPS (3 total):
---   Shop 4 (Shop ABC): Products 1,2 | Orders from Customer 1,2
+--   Shop 4 (Shop ABC): Products 1 Item 1, 2 | Orders from Customer 1,2
 --   Shop 5 (Shop XYZ): Product 3 | No orders yet
 --   Shop 6 (Tech Store): Products 4,5 | Orders from Customer 1,3
 --
@@ -27,7 +27,7 @@ USE ecommerce_db;
 -- ORDERS (4 total):
 --   Order 1: Customer 1 → Items 1,2 (Shop 4) - Processing - 1,985,000 VND
 --   Order 2: Customer 2 → Item 3 (Shop 4) - Cancelled - 904,000 VND
---   Order 3: Customer 3 → Item 5 (Shop 6) - Delivered - 1,156,000 VND
+--   Order 3: Customer 3 → Item 4 (Shop 5) - Delivered - 31,000 VND
 --   Order 4: Customer 1 → Item 6 (Shop 6) - Shipped - 84,500 VND
 --
 -- REVIEWS (5 total):
@@ -44,8 +44,8 @@ USE ecommerce_db;
 --
 -- SHOP STATS:
 --   Shop 4: 2 products, 3 items, 2 orders (1 cancelled), 2 reviews
---   Shop 5: 1 product, 1 item, 0 orders, 1 review (for product)
---   Shop 6: 2 products, 2 items, 2 orders, 2 reviews (1 shop, 1 product)
+--   Shop 5: 1 product, 1 item, 1 order, 1 review (for product)
+--   Shop 6: 2 products, 2 items, 1 order, 2 reviews (1 shop, 1 product)
 -- ==========================
 
 -- ==========================
@@ -60,31 +60,27 @@ VALUES
  ('s2@gmail.com','1234','Shop','Shop XYZ','0905555555','Active'),
  ('s3@gmail.com','1234','Shop','Tech Store','0906666666','Active'),
  ('admin1@gmail.com','1234','Admin','Admin Core','0907777777','Active');
-
+	
 -- ==========================
 -- 2. CUSTOMER (customer_id = account_id)
 -- ==========================
-INSERT INTO Customer (customer_id, address, add_phone)
-VALUES
- (1,'123 HCM Street','0908888888'), -- Order 1 (1,985,000) + Order 4 (84,500)
- (2,'456 HCM Street','0909999999'), -- Order 2 (Cancelled, không tính)
- (3,'789 Ha Noi Street','0911111111'); -- Order 3
+UPDATE Customer SET address = '123 HCM Street', add_phone = '0908888888' WHERE customer_id = 1;
+UPDATE Customer SET address = '456 HCM Street', add_phone = '0909999999' WHERE customer_id = 2;
+UPDATE Customer SET address = '789 Ha Noi Street', add_phone = '0911111111' WHERE customer_id = 3;
 
 -- ==========================
 -- 3. SHOP (shop_id = account_id)
+-- Trigger trg_account_after_insert đã tự động tạo Shop records
+-- Chỉ cần UPDATE thêm thông tin
 -- ==========================
-INSERT INTO Shop (shop_id, shop_name, shop_phone, address_shop, rating, shop_status)
-VALUES
- (4,'Shop ABC','0904444444','12 District 1',5,'Open'),
- (5,'Shop XYZ','0905555555','45 District 3',4,'Open'),
- (6,'Tech Store','0906666666','67 District 7',5,'Open');
+UPDATE Shop SET shop_name = 'Shop ABC', shop_phone = '0904444444', address_shop = '12 District 1', rating = 4, shop_status = 'Open' WHERE shop_id = 4;
+UPDATE Shop SET shop_name = 'Shop XYZ', shop_phone = '0905555555', address_shop = '45 District 3', rating = 0, shop_status = 'Open' WHERE shop_id = 5;
+UPDATE Shop SET shop_name = 'Tech Store', shop_phone = '0906666666', address_shop = '67 District 7', rating = 5, shop_status = 'Open' WHERE shop_id = 6;
 
 -- ==========================
 -- 3.1. ADMIN (admin_id = account_id)
 -- ==========================
-INSERT INTO Admin (admin_id, role, note)
-VALUES
- (7,'Core','Main administrator');
+UPDATE Admin SET role = 'Core', note = 'Main administrator' WHERE admin_id = 7;
 
 -- ==========================
 -- 4. CATEGORY
@@ -122,10 +118,10 @@ VALUES
 
 -- ==========================
 -- 7. CART
+-- Trigger trg_account_after_insert đã tự động tạo Cart cho Customer
+-- Không cần INSERT thủ công
 -- ==========================
-INSERT INTO Cart (customer_id)
-VALUES
- (1),(2),(3);
+-- INSERT INTO Cart (customer_id) VALUES (1),(2),(3); -- Bỏ qua vì trigger đã tạo
 
 -- ==========================
 -- 8. CART ITEM
@@ -152,9 +148,9 @@ VALUES
 -- ==========================
 INSERT INTO Voucher (code, discount_type, discount_value, min_order_value, expired_date, usage_limit, status)
 VALUES
- ('DISCOUNT10','Percentage',10,100,'2025-12-31',10,'Active'),
- ('SAVE50','Amount',50000,200,'2025-12-31',10,'Active'),
- ('NEWYEAR5','Percentage',5,50,'2026-01-01',20,'Active'),
+ ('DISCOUNT10','Percentage',10,100000,'2025-12-31',10,'Active'),
+ ('SAVE50','Amount',50000,200000,'2025-12-31',10,'Active'),
+ ('NEWYEAR5','Percentage',5,50000,'2026-01-01',20,'Active'),
  ('EXPIRED100','Amount',100,300000,'2025-11-30',5,'Expired');
 
 -- ==========================
@@ -163,10 +159,10 @@ VALUES
 -- Note: total_amount = subtotal + shipping_fee - voucher_discount
 INSERT INTO `Order` (customer_id, shipping_id, voucher_id, status, shipping_address, payment_method, note)
 VALUES
- (1,1,1,'Processing','123 HCM Street','COD','Please call before delivery'), -- (1000000 + 1200000) + 5000 - 220000 (10% voucher)
+ (1,1,1,'Delivered','123 HCM Street','COD','Please call before delivery'), -- (1000000 + 1200000) + 5000 - 220000 (10% voucher, đủ min 100k)
  (2,2,NULL,'Cancelled','456 HCM Street','Banking',NULL), -- 900000 + 4000 (shipping)
- (3,3,2,'Delivered','789 Ha Noi Street','Momo','Leave at the door'), -- 1200000 + 6000 (shipping) - 50000 (voucher)
- (1,4,NULL,'Shipped','123 HCM Street','ZaloPay',NULL); -- 80000 + 4500 (shipping)
+ (3,3,2,'Delivered','789 Ha Noi Street','Momo','Leave at the door'), -- 25000 + 6000 (shipping) - Voucher không áp dụng (subtotal < min 200k)
+ (1,4,NULL,'Delivered','123 HCM Street','ZaloPay',NULL); -- 80000 + 4500 (shipping)
 
 -- ==========================
 -- 12. ORDER ITEM (item_id thay vì variantID)
@@ -176,15 +172,20 @@ VALUES
  (1,1,4,1,1000000),
  (1,2,4,1,1200000),
  (2,3,4,1,900000),
- (3,4,6,1,1200000),
+ (3,4,5,1,25000),
  (4,6,6,1,80000);
 -- ==========================
 -- 13. REVIEW
+-- Chỉ review sản phẩm/shop từ đơn hàng Delivered
+-- Order 1 (Delivered): Customer 1 → Product 1 (item 1,2) → Shop 4
+-- Order 3 (Delivered): Customer 3 → Product 3 (item 4) → Shop 5
+-- Order 4 (Delivered): Customer 1 → Product 5 (item 6) → Shop 6
 -- ==========================
 INSERT INTO Review (customer_id, target_type, target_id, rating, comment, image_url)
 VALUES
- (1,'Product',1,5,'Excellent product',NULL),
- (2,'Product',3,4,'Good quality',NULL),
- (1,'Shop',4,5,'Very professional',NULL),
- (3,'Shop',6,5,'Fast delivery',NULL),
- (2,'Product',4,5,'Laptop runs smoothly',NULL);
+ (1,'Product',1,5,'Excellent product',NULL),         -- Customer 1 bought Product 1 (Order 1)
+ (3,'Product',3,4,'Good quality',NULL),              -- Customer 3 bought Product 3 (Order 3)
+ (1,'Shop',4,5,'Very professional',NULL),            -- Customer 1 bought from Shop 4 (Order 1)
+ (3,'Shop',5,5,'Fast delivery',NULL),                -- Customer 3 bought from Shop 5 (Order 3)
+ (1,'Product',5,5,'Great headset',NULL),             -- Customer 1 bought Product 5 (Order 4)
+ (1,'Shop',6,4,'Good service',NULL);                 -- Customer 1 bought from Shop 6 (Order 4)

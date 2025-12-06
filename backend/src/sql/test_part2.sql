@@ -5,319 +5,506 @@
 
 USE ecommerce_db;
 
+-- ==========================
+-- INITIAL DATA STATE
+-- ==========================
+-- Expected data:
+-- - Account 1-3: Customers (customer_id = account_id)
+-- - Account 4-6: Shops (shop_id = account_id)
+-- - Account 7: Admin
+-- - 5 Products across 3 shops
+-- - 4 Orders total
+-- - 7 Reviews (product + shop reviews)
+-- ==========================
+
 -- =============================================
 -- TEST FUNCTIONS
 -- =============================================
 
-SELECT '========================================' AS header;
-SELECT 'TESTING FUNCTIONS' AS header;
-SELECT '========================================' AS header;
+-- ==========================
+-- TEST 1: FUNCTION fn_calculate_order_total
+-- ==========================
+SELECT '=== TEST 1: fn_calculate_order_total ===' AS test_name;
 
--- TEST 1: fn_calculate_order_total
-SELECT '' AS space;
-SELECT '✅ TEST FUNCTION 1: fn_calculate_order_total' AS test_name;
-SELECT 
-    o.order_id,
-    o.customer_id,
-    fn_calculate_order_total(o.order_id) AS calculated_total,
-    o.total_amount AS stored_total,
-    CASE 
-        WHEN ABS(fn_calculate_order_total(o.order_id) - o.total_amount) < 0.01 
-        THEN '✅ MATCH' 
-        ELSE '❌ MISMATCH' 
-    END AS validation_status
-FROM `Order` o
-LIMIT 5;
+SELECT fn_calculate_order_total(1) AS result;
+-- Expected: 1985000.00
+-- Calculation: (1000000 + 1200000) + 5000 - 220000 = 1985000
 
--- TEST 2: fn_get_customer_total_spent
-SELECT '' AS space;
-SELECT '✅ TEST FUNCTION 2: fn_get_customer_total_spent' AS test_name;
-SELECT 
-    c.customer_id,
-    a.full_name,
-    fn_get_customer_total_spent(c.customer_id) AS calculated_spent,
-    c.total_spent AS stored_spent,
-    CASE 
-        WHEN ABS(fn_get_customer_total_spent(c.customer_id) - c.total_spent) < 0.01 
-        THEN '✅ MATCH' 
-        ELSE '❌ MISMATCH' 
-    END AS validation_status
-FROM Customer c
-INNER JOIN Account a ON c.account_id = a.account_id
-LIMIT 5;
+SELECT fn_calculate_order_total(2) AS result;
+-- Expected: 904000.00
+-- Calculation: 900000 + 4000 = 904000
 
--- TEST 3: fn_get_shop_revenue
-SELECT '' AS space;
-SELECT '✅ TEST FUNCTION 3: fn_get_shop_revenue' AS test_name;
-SELECT 
-    s.shop_id,
-    s.shop_name,
-    fn_get_shop_revenue(s.shop_id) AS total_revenue,
-    CONCAT('$', FORMAT(fn_get_shop_revenue(s.shop_id), 2)) AS formatted_revenue
-FROM Shop s
-ORDER BY fn_get_shop_revenue(s.shop_id) DESC;
+SELECT fn_calculate_order_total(3) AS result;
+-- Expected: 31000.00
+-- Calculation: 25000 + 6000 = 31000
 
--- TEST 4: fn_calculate_shop_rating
-SELECT '' AS space;
-SELECT '✅ TEST FUNCTION 4: fn_calculate_shop_rating' AS test_name;
-SELECT 
-    s.shop_id,
-    s.shop_name,
-    fn_calculate_shop_rating(s.shop_id) AS calculated_rating,
-    s.rating AS stored_rating,
-    CASE 
-        WHEN ABS(fn_calculate_shop_rating(s.shop_id) - s.rating) < 0.01 
-        THEN '✅ MATCH' 
-        ELSE '⚠️ DIFFERENT' 
-    END AS validation_status
-FROM Shop s;
+SELECT fn_calculate_order_total(4) AS result;
+-- Expected: 84500.00
+-- Calculation: 80000 + 4500 = 84500
+
+-- ==========================
+-- TEST 2: FUNCTION fn_get_customer_total_spent
+-- ==========================
+SELECT '=== TEST 2: fn_get_customer_total_spent ===' AS test_name;
+
+SELECT fn_get_customer_total_spent(1) AS result;
+-- Expected: 2069500.00
+-- Customer 1 orders: 1 (1985000) + 4 (84500)
+
+SELECT fn_get_customer_total_spent(2) AS result;
+-- Expected: 0.00
+-- Customer 2 only has cancelled order
+
+SELECT fn_get_customer_total_spent(3) AS result;
+-- Expected: 31000.00
+-- Customer 3: Order 3 (31000)
+
+-- ==========================
+-- TEST 3: FUNCTION fn_get_shop_revenue
+-- ==========================
+SELECT '=== TEST 3: fn_get_shop_revenue ===' AS test_name;
+
+SELECT fn_get_shop_revenue(4) AS result;
+-- Expected: 2200000.00
+-- Shop 4: Order 2 items from poduct 1 (1 000 000 + 1 200 000) - voucher (220 000) = 1 980 000
+
+SELECT fn_get_shop_revenue(5) AS result;
+-- Expected: 25000.00
+-- Shop 5: Order 3 item (25 000 * qty 1) = 25000
+
+SELECT fn_get_shop_revenue(6) AS result;
+-- Expected: 80000.00
+-- Shop 6: Order 4 item 6 (80000)
+
+-- ==========================
+-- TEST 4: FUNCTION fn_calculate_shop_rating
+-- ==========================
+SELECT '=== TEST 4: fn_calculate_shop_rating ===' AS test_name;
+
+SELECT fn_calculate_shop_rating(4) AS result;
+-- Expected: 4.00
+-- Reviews 3,6 for Shop 4: (5+3)/2 = 4.00
+
+SELECT fn_calculate_shop_rating(5) AS result;
+-- Expected: 0.00
+-- No shop reviews for Shop 5
+
+SELECT fn_calculate_shop_rating(6) AS result;
+-- Expected: 5.00
+-- Review 4 for Shop 6: 5 stars
+
+-- ==========================
+-- TEST 5: FUNCTION fn_calculate_product_rating
+-- ==========================
+SELECT '=== TEST 5: fn_calculate_product_rating ===' AS test_name;
+
+SELECT fn_calculate_product_rating(1) AS result;
+-- Expected: 4.50
+-- Reviews 1,7 for Product 1: (5+4)/2 = 4.50
+
+SELECT fn_calculate_product_rating(2) AS result;
+-- Expected: 0.00
+-- No reviews for Product 2
+
+SELECT fn_calculate_product_rating(3) AS result;
+-- Expected: 4.00
+-- Review 2 for Product 3: 4 stars
+
+SELECT fn_calculate_product_rating(4) AS result;
+-- Expected: 5.00
+-- Review 5 for Product 4: 5 stars
+
+SELECT fn_calculate_product_rating(5) AS result;
+-- Expected: 0.00
+-- No reviews for Product 5
+
+-- ==========================
+-- TEST 5.1: FUNCTION fn_get_order_total_items_with_cursor
+-- ==========================
+SELECT '=== TEST 5.1: fn_get_order_total_items_with_cursor ===' AS test_name;
+
+SELECT fn_get_order_total_items_with_cursor(1) AS result;
+-- Expected: 2
+-- Order 1 has 2 items (qty 1 + qty 1 = 2 total)
+
+SELECT fn_get_order_total_items_with_cursor(2) AS result;
+-- Expected: 1
+-- Order 2 has 1 item (qty 1)
+
+SELECT fn_get_order_total_items_with_cursor(3) AS result;
+-- Expected: 1
+-- Order 3 has 1 item (qty 1)
+
+SELECT fn_get_order_total_items_with_cursor(4) AS result;
+-- Expected: 1
+-- Order 4 has 1 item (qty 1)
+
+SELECT fn_get_order_total_items_with_cursor(999) AS result;
+-- Expected: 0
+-- Order 999 does not exist
 
 -- =============================================
 -- TEST PROCEDURES
 -- =============================================
 
-SELECT '' AS space;
-SELECT '========================================' AS header;
-SELECT 'TESTING PROCEDURES' AS header;
-SELECT '========================================' AS header;
+-- ==========================
+-- TEST 6: PROCEDURE sp_get_shop_revenue_report
+-- ==========================
+SELECT '=== TEST 6: sp_get_shop_revenue_report ===' AS test_name;
 
--- TEST 5: sp_get_shop_revenue_report
-SELECT '' AS space;
-SELECT '✅ TEST PROCEDURE 1: sp_get_shop_revenue_report' AS test_name;
-SELECT 'Parameters: shop_id=1, from_date=2025-01-01, to_date=2025-12-31' AS note;
-CALL sp_get_shop_revenue_report(1, '2025-01-01', '2025-12-31');
+SELECT 'Shop 4 - Full year 2025 report:' AS description;
+CALL sp_get_shop_revenue_report(4, '2025-01-01', '2025-12-31');
+-- Expected OUTPUT 1:
+-- | shop_id | shop_name | total_orders | total_items_sold | total_revenue | avg_item_value |
+-- | 4       | Shop ABC  | 1            | 2                | 2200000       | 1100000        |
+-- Expected OUTPUT 2: iPhone variants (Red, Blue)
 
--- TEST 6: sp_get_product_statistics (all products)
 SELECT '' AS space;
-SELECT '✅ TEST PROCEDURE 3: sp_get_product_statistics (no filters)' AS test_name;
-CALL sp_get_product_statistics(NULL, NULL, NULL, NULL);
+SELECT 'Shop 5 - Full year 2025 report:' AS description;
+CALL sp_get_shop_revenue_report(5, '2025-01-01', '2025-12-31');
+-- Expected OUTPUT 1:
+-- | shop_id | shop_name | total_orders | total_items_sold | total_revenue | avg_item_value |
+-- | 5       | Shop XYZ  | 1            | 1                | 25000         | 25000          |
+-- Expected OUTPUT 2: T-Shirt
 
--- TEST 7: sp_get_product_statistics (with filters)
 SELECT '' AS space;
-SELECT '✅ TEST PROCEDURE 3: sp_get_product_statistics (shop_id=1, price 10000-100000)' AS test_name;
-CALL sp_get_product_statistics(NULL, 1, 10000, 100000);
+SELECT 'Shop 6 - Full year 2025 report:' AS description;
+CALL sp_get_shop_revenue_report(6, '2025-01-01', '2025-12-31');
+-- Expected OUTPUT 1:
+-- | shop_id | shop_name | total_orders | total_items_sold | total_revenue | avg_item_value |
+-- | 6       | Tech Store| 1            | 1                | 80000         | 80000          |
+-- Expected OUTPUT 2: Wireless Headset
 
--- TEST 8: sp_apply_voucher (valid voucher)
+-- ==========================
+-- TEST 7: PROCEDURE sp_get_category_hierarchy
+-- ==========================
+SELECT '=== TEST 7: sp_get_category_hierarchy ===' AS test_name;
+
+CALL sp_get_category_hierarchy();
+-- Expected OUTPUT:
+-- | category_id | category_name | level | path                  |
+-- | 1           | Electronics   | 0     | Electronics           |
+-- | 3           | Phones        | 1     |   Phones              |
+-- | 4           | Laptops       | 1     |   Laptops             |
+-- | 2           | Fashion       | 0     | Fashion               |
+-- | 5           | Clothes       | 1     |   Clothes             |
+
+-- ==========================
+-- TEST 8: PROCEDURE sp_get_category_all_children
+-- ==========================
+SELECT '=== TEST 8: sp_get_category_all_children ===' AS test_name;
+
+SELECT 'Get all children of Electronics (category_id=1):' AS description;
+CALL sp_get_category_all_children(1);
+-- Expected OUTPUT:
+-- | category_id | category_name | level |
+-- | 1           | Electronics   | 0     |
+-- | 3           | Phones        | 1     |
+-- | 4           | Laptops       | 1     |
+
 SELECT '' AS space;
-SELECT '✅ TEST PROCEDURE 4: sp_apply_voucher (valid)' AS test_name;
+SELECT 'Get all children of Fashion (category_id=2):' AS description;
+CALL sp_get_category_all_children(2);
+-- Expected OUTPUT:
+-- | category_id | category_name | level |
+-- | 2           | Fashion       | 0     |
+-- | 5           | Clothes       | 1     |
+
+-- ==========================
+-- TEST 9: PROCEDURE sp_get_category_all_parents
+-- ==========================
+SELECT '=== TEST 9: sp_get_category_all_parents ===' AS test_name;
+
+SELECT 'Get all parents of Phones (category_id=3):' AS description;
+CALL sp_get_category_all_parents(3);
+-- Expected OUTPUT:
+-- | category_id | category_name | level |
+-- | 3           | Phones        | 0     |
+-- | 1           | Electronics   | 1     |
+
+SELECT '' AS space;
+SELECT 'Get all parents of Clothes (category_id=5):' AS description;
+CALL sp_get_category_all_parents(5);
+-- Expected OUTPUT:
+-- | category_id | category_name | level |
+-- | 5           | Clothes       | 0     |
+-- | 2           | Fashion       | 1     |
+
+-- ==========================
+-- TEST 10: PROCEDURE sp_create_order_from_cart
+-- ==========================
+SELECT '=== TEST 10: sp_create_order_from_cart ===' AS test_name;
+
+-- Setup: Add items to Customer 1's cart
+DELETE FROM CartItem WHERE cart_id = 1;
+INSERT INTO CartItem (cart_id, item_id, quantity) VALUES (1, 1, 1);
+INSERT INTO CartItem (cart_id, item_id, quantity) VALUES (1, 4, 2);
+
+SELECT 'Before creating order - Cart items:' AS info;
+SELECT ci.cart_id, ci.item_id, ci.quantity, pi.product_id, pi.price 
+FROM CartItem ci
+INNER JOIN ProductItem pi ON ci.item_id = pi.item_id
+WHERE ci.cart_id = 1;
+-- Expected: 2 rows (item 1, item 4)
+
+CALL sp_create_order_from_cart(1, 1, NULL, '123 Updated Street', 'Banking', 'Test from cart', @new_order_id);
+
+SELECT 'New order created:' AS info;
+SELECT @new_order_id AS order_id;
+-- Expected: New order_id (likely 5+)
+
+SELECT 'After creating order - Order details:' AS info;
+SELECT order_id, customer_id, status, payment_method, shipping_address FROM `Order` WHERE order_id = @new_order_id;
+-- Expected: status='Processing', payment_method='Banking'
+
+SELECT 'Order items:' AS info;
+SELECT order_id, item_id, shop_id, quantity, price_at_purchase FROM OrderItem WHERE order_id = @new_order_id;
+-- Expected: 2 rows (items from cart)
+
+SELECT 'Cart after order - Should be empty:' AS info;
+SELECT COUNT(*) AS remaining_items FROM CartItem WHERE cart_id = 1;
+-- Expected: 0 (cart items deleted after order creation)
+
+-- ==========================
+-- TEST 11: PROCEDURE sp_apply_voucher
+-- ==========================
+SELECT '=== TEST 11: sp_apply_voucher ===' AS test_name;
+
+SELECT 'Test 11.1: Valid percentage voucher (DISCOUNT10)' AS test_case;
 SET @discount = 0;
 SET @valid = FALSE;
 SET @msg = '';
-CALL sp_apply_voucher(1, 500000, @discount, @valid, @msg);
-SELECT 
-    @discount AS discount_amount, 
-    @valid AS is_valid, 
-    @msg AS message;
+CALL sp_apply_voucher('DISCOUNT10', 500000, @discount, @valid, @msg);
+SELECT @discount AS discount_amount, @valid AS is_valid, @msg AS message;
+-- Expected: discount=50000, is_valid=1, message='Voucher applied successfully'
 
--- TEST 9: sp_apply_voucher (order too small)
-SELECT '' AS space;
-SELECT '✅ TEST PROCEDURE 4: sp_apply_voucher (order too small)' AS test_name;
+SELECT 'Test 11.2: Valid amount voucher (SAVE50) - Order meets min' AS test_case;
 SET @discount = 0;
 SET @valid = FALSE;
 SET @msg = '';
-CALL sp_apply_voucher(1, 50000, @discount, @valid, @msg);
-SELECT 
-    @discount AS discount_amount, 
-    @valid AS is_valid, 
-    @msg AS message;
+CALL sp_apply_voucher('SAVE50', 300000, @discount, @valid, @msg);
+SELECT @discount AS discount_amount, @valid AS is_valid, @msg AS message;
+-- Expected: discount=50000, is_valid=1, message='Voucher applied successfully'
 
--- TEST 10: sp_create_order_from_cart
-SELECT '' AS space;
-SELECT '✅ TEST PROCEDURE 2: sp_create_order_from_cart' AS test_name;
-SELECT '⚠️ WARNING: This will modify database (create order, clear cart)' AS warning;
-SELECT 'Comment out if you dont want to test it' AS note;
-/*
--- First, add some items to cart
-INSERT INTO CartItem (cart_id, item_id, quantity) 
-VALUES (1, 1, 2);
+SELECT 'Test 11.3: Valid amount voucher (SAVE50) - Order below min' AS test_case;
+SET @discount = 0;
+SET @valid = FALSE;
+SET @msg = '';
+CALL sp_apply_voucher('SAVE50', 150000, @discount, @valid, @msg);
+SELECT @discount AS discount_amount, @valid AS is_valid, @msg AS message;
+-- Expected: discount=0, is_valid=0, message mentions min order value
 
--- Then create order
-CALL sp_create_order_from_cart(1, 1, NULL, '123 Test Street', 'Credit Card', @new_order_id);
-SELECT @new_order_id AS new_order_id;
-
--- Verify order was created
-SELECT * FROM `Order` WHERE order_id = @new_order_id;
-SELECT * FROM OrderItem WHERE order_id = @new_order_id;
-*/
+SELECT 'Test 11.4: Non-existent voucher (should fail validation)' AS test_case;
+SET @discount = 0;
+SET @valid = FALSE;
+SET @msg = '';
+CALL sp_apply_voucher('NONEXISTENT', 500000, @discount, @valid, @msg);
+SELECT @discount AS discount_amount, @valid AS is_valid, @msg AS message;
+-- Expected: discount=0, is_valid=0, message='Voucher code not found'
 
 -- =============================================
 -- TEST TRIGGERS
 -- =============================================
 
-SELECT '' AS space;
-SELECT '========================================' AS header;
-SELECT 'TESTING TRIGGERS' AS header;
-SELECT '========================================' AS header;
+-- ==========================
+-- TEST 7: TRIGGER trg_account_after_insert
+-- ==========================
+SELECT '=== TEST 7: trg_account_after_insert ===' AS test_name;
 
--- TEST 11: trg_order_item_before_insert (DERIVED VALUE)
-SELECT '' AS space;
-SELECT '✅ TEST TRIGGER 1: trg_order_item_before_insert' AS test_name;
-SELECT 'Testing: price_at_purchase and shop_id auto-fill' AS description;
-SELECT '⚠️ This test will INSERT data - comment out if not testing' AS warning;
-/*
--- Get current price of item #1
-SELECT item_id, price, shop_id FROM ProductItem WHERE item_id = 1;
-
--- Insert without price_at_purchase (trigger should set it)
-INSERT INTO OrderItem (order_id, variantID, quantity)
-VALUES (1, 1, 1);
-
--- Verify trigger set the price
-SELECT 
-    order_item_id,
-    variantID,
-    quantity,
-    price_at_purchase,
-    shop_id,
-    'Trigger should have set price_at_purchase and shop_id' AS note
-FROM OrderItem 
-WHERE order_item_id = LAST_INSERT_ID();
-*/
-
--- TEST 12: trg_review_before_insert (ENFORCE RULE - rating 1-5)
-SELECT '' AS space;
-SELECT '✅ TEST TRIGGER 3: trg_review_before_insert (rating validation)' AS test_name;
-SELECT 'Testing: Rating must be between 1 and 5' AS description;
-SELECT '⚠️ This test will try to INSERT invalid data - should fail' AS warning;
-/*
--- This should FAIL with error "Rating must be between 1 and 5"
-INSERT INTO Review (customer_id, target_type, target_id, rating, comment)
-VALUES (1, 'Product', 1, 6, 'Invalid rating test');
-*/
-
--- TEST 13: trg_review_before_insert (ENFORCE RULE - must purchase)
-SELECT '' AS space;
-SELECT '✅ TEST TRIGGER 3: trg_review_before_insert (purchase validation)' AS test_name;
-SELECT 'Testing: Can only review purchased products' AS description;
-SELECT '⚠️ This test will try to INSERT invalid data - should fail' AS warning;
-/*
--- This should FAIL with error "Can only review products from delivered orders"
-INSERT INTO Review (customer_id, target_type, target_id, rating, comment)
-VALUES (1, 'Product', 999, 5, 'Product not purchased test');
-*/
-
--- TEST 14: trg_product_item_before_update (ENFORCE RULE)
-SELECT '' AS space;
-SELECT '✅ TEST TRIGGER 5: trg_product_item_before_update' AS test_name;
-SELECT 'Testing: Stock cannot be negative' AS description;
-SELECT '⚠️ This test will try to UPDATE to invalid data - should fail' AS warning;
-/*
--- This should FAIL with error "Product item stock cannot be negative"
-UPDATE ProductItem SET stock = -10 WHERE item_id = 1;
-
--- This should FAIL with error "Product item price cannot be negative"
-UPDATE ProductItem SET price = -100 WHERE item_id = 1;
-*/
-
--- TEST 15: trg_account_after_insert (DERIVED VALUE)
-SELECT '' AS space;
-SELECT '✅ TEST TRIGGER 6: trg_account_after_insert' AS test_name;
-SELECT 'Testing: Auto-create Customer record and Cart' AS description;
-SELECT '⚠️ This test will INSERT data - comment out if not testing' AS warning;
-/*
--- Create new customer account (trigger should auto-create Customer + Cart)
+-- Test 7.1: Create new Customer account (trigger auto-creates Customer + Cart)
 INSERT INTO Account (email, password, role, full_name, phone, status)
-VALUES ('test@test.com', 'password123', 'Customer', 'Test User', '0123456789', 'Active');
+VALUES ('trigger_test_customer@gmail.com', '1234', 'Customer', 'Trigger Test Cust', '0999999999', 'Active');
+SET @test_cust_id = LAST_INSERT_ID();
 
-SET @new_account_id = LAST_INSERT_ID();
+SELECT 'Customer record created by trigger:' AS info;
+SELECT customer_id, total_spent, total_order FROM Customer WHERE customer_id = @test_cust_id;
+-- Expected: customer_id = @test_cust_id, total_spent = 0, total_order = 0
 
--- Verify trigger created Customer record
-SELECT * FROM Customer WHERE account_id = @new_account_id;
+SELECT 'Cart record created by trigger:' AS info;
+SELECT cart_id, customer_id FROM Cart WHERE customer_id = @test_cust_id;
+-- Expected: cart_id exists, customer_id = @test_cust_id
 
--- Verify trigger created Cart
-SELECT * FROM Cart WHERE customer_id = @new_account_id;
-*/
+-- Test 7.2: Create new Shop account (trigger auto-creates Shop record)
+INSERT INTO Account (email, password, role, full_name, phone, status)
+VALUES ('trigger_test_shop@gmail.com', '1234', 'Shop', 'Trigger Test Shop', '0988888888', 'Active');
+SET @test_shop_id = LAST_INSERT_ID();
 
--- TEST 16: trg_order_item_after_insert
-SELECT '' AS space;
-SELECT '✅ TEST TRIGGER 2: trg_order_item_after_insert' AS test_name;
-SELECT 'Testing: Stock decreases after order' AS description;
-SELECT 'Check stock before and after inserting OrderItem' AS note;
-/*
--- Check stock before
-SELECT item_id, stock FROM ProductItem WHERE item_id = 1;
+SELECT 'Shop record created by trigger:' AS info;
+SELECT shop_id, shop_name, rating FROM Shop WHERE shop_id = @test_shop_id;
+-- Expected: shop_id = @test_shop_id, shop_name = 'Shop <id>', rating = 0
 
--- Insert order item (trigger should decrease stock)
-INSERT INTO OrderItem (order_id, variantID, quantity, price_at_purchase, shop_id)
-VALUES (1, 1, 5, 100000, 1);
+-- Test 7.3: Create new Admin account (trigger auto-creates Admin record)
+INSERT INTO Account (email, password, role, full_name, phone, status)
+VALUES ('trigger_test_admin@gmail.com', '1234', 'Admin', 'Trigger Test Admin', '0977777777', 'Active');
+SET @test_admin_id = LAST_INSERT_ID();
 
--- Check stock after (should be decreased by 5)
-SELECT item_id, stock FROM ProductItem WHERE item_id = 1;
-*/
+SELECT 'Admin record created by trigger:' AS info;
+SELECT admin_id, role FROM Admin WHERE admin_id = @test_admin_id;
+-- Expected: admin_id = @test_admin_id, role = 'Support'
 
--- TEST 17: trg_review_after_insert
-SELECT '' AS space;
-SELECT '✅ TEST TRIGGER 4: trg_review_after_insert' AS test_name;
-SELECT 'Testing: Shop rating updates after new review' AS description;
-/*
--- Check shop rating before
-SELECT shop_id, shop_name, rating FROM Shop WHERE shop_id = 1;
+-- ==========================
+-- TEST 8: TRIGGER trg_order_item_before_insert
+-- ==========================
+SELECT '=== TEST 8: trg_order_item_before_insert ===' AS test_name;
 
--- Add a review (trigger should update shop rating)
+-- Create test order
+INSERT INTO `Order` (customer_id, shipping_id, status, shipping_address, payment_method)
+VALUES (1, 1, 'Processing', '123 Test St', 'COD');
+SET @test_order = LAST_INSERT_ID();
+
+-- Test: Insert OrderItem without price_at_purchase (trigger auto-fills from ProductItem)
+SELECT 'Before trigger - ProductItem 4 details:' AS info;
+SELECT item_id, price, shop_id FROM ProductItem WHERE item_id = 4;
+-- Expected: price = 25000, shop_id = 5
+
+INSERT INTO OrderItem (order_id, item_id, quantity) VALUES (@test_order, 4, 1);
+
+SELECT 'After trigger - OrderItem auto-filled:' AS info;
+SELECT order_id, item_id, shop_id, quantity, price_at_purchase FROM OrderItem WHERE order_id = @test_order;
+-- Expected: shop_id = 5, price_at_purchase = 25000 (auto-filled by trigger)
+
+-- ==========================
+-- TEST 9: TRIGGER trg_order_item_after_insert
+-- ==========================
+SELECT '=== TEST 9: trg_order_item_after_insert ===' AS test_name;
+
+SELECT 'Before trigger - ProductItem 4 stock:' AS info;
+SELECT item_id, stock FROM ProductItem WHERE item_id = 4;
+-- Expected: stock = 100 (before the previous OrderItem insert)
+
+SELECT 'After trigger - ProductItem 4 stock decreased:' AS info;
+SELECT item_id, stock FROM ProductItem WHERE item_id = 4;
+-- Expected: stock = 99 (decreased by 1 from previous insert)
+
+-- Insert another item to verify stock decrease
+-- INSERT INTO OrderItem (order_id, item_id, quantity) VALUES (@test_order, 4, 1000);
+INSERT INTO OrderItem (order_id, item_id, quantity) VALUES (@test_order, 4, 2);
+
+SELECT 'After second trigger - ProductItem 4 stock:' AS info;
+SELECT item_id, stock FROM ProductItem WHERE item_id = 4;
+-- Expected: stock = 97 (99 - 2 = 97)
+
+-- ==========================
+-- TEST 10: TRIGGER trg_review_before_insert (VALIDATION)
+-- ==========================
+SELECT '=== TEST 10: trg_review_before_insert ===' AS test_name;
+
+SELECT 'Test 10.1: Insert review with invalid rating (should fail)' AS test_case;
+-- Uncomment to test error:
+-- INSERT INTO Review (customer_id, target_type, target_id, rating, comment)
+-- VALUES (1, 'Product', 1, 6, 'Invalid rating > 5');
+-- Expected ERROR: Rating must be between 1 and 5
+
+SELECT 'Test 10.2: Insert review without purchasing product (should fail)' AS test_case;
+-- Uncomment to test error:
+-- INSERT INTO Review (customer_id, target_type, target_id, rating, comment)
+-- VALUES (1, 'Product', 2, 5, 'Never bought Product 2');
+-- Expected ERROR: Can only review products from delivered orders
+
+SELECT 'Test 10.3: Valid product review (success)' AS test_case;
+-- Customer 3 purchased Product 3 (T-Shirt) in delivered Order 3
 INSERT INTO Review (customer_id, target_type, target_id, rating, comment)
-VALUES (1, 'Shop', 1, 5, 'Test review');
+VALUES (3, 'Product', 3, 5, 'Great T-Shirt quality!');
+-- Expected: Review inserted successfully
 
--- Check shop rating after (should be recalculated)
-SELECT shop_id, shop_name, rating FROM Shop WHERE shop_id = 1;
-*/
+SELECT 'Review inserted:' AS info;
+SELECT review_id, customer_id, target_id, rating FROM Review 
+WHERE customer_id = 3 AND target_id = 3 AND target_type = 'Product' 
+ORDER BY review_id DESC LIMIT 1;
+-- Expected: New review with rating = 5
 
--- =============================================
--- SUMMARY REPORT
--- =============================================
+-- ==========================
+-- TEST 11: TRIGGER trg_review_after_insert
+-- ==========================
+SELECT '=== TEST 11: trg_review_after_insert ===' AS test_name;
 
-SELECT '' AS space;
-SELECT '========================================' AS header;
-SELECT 'SUMMARY REPORT' AS header;
-SELECT '========================================' AS header;
+SELECT 'Before review - Product 3 rating:' AS info;
+SELECT product_id, rating FROM Product WHERE product_id = 3;
+-- Expected: rating = 4.00 (from Review 2 only, before new review)
 
--- Count all objects
+SELECT 'After review insert - Product 3 rating updated:' AS info;
+SELECT product_id, rating FROM Product WHERE product_id = 3;
+-- Expected: rating = 4.50 (average of (4+5)/2 = 4.50, now with 2 reviews)
+
+-- Insert shop review to test shop rating update
+SELECT 'Before shop review - Shop 5 rating:' AS info;
+SELECT shop_id, rating FROM Shop WHERE shop_id = 5;
+-- Expected: rating = 0.00 (no shop reviews yet)
+
+-- Customer 3 purchased from Shop 5 in Order 3, can review shop
+INSERT INTO Review (customer_id, target_type, target_id, rating, comment)
+VALUES (3, 'Shop', 5, 5, 'Excellent shop service!');
+-- Expected: Review inserted successfully
+
+SELECT 'After shop review - Shop 5 rating updated:' AS info;
+SELECT shop_id, rating FROM Shop WHERE shop_id = 5;
+-- Expected: rating = 5.00 (trigger auto-calculated from review)
+
+-- ==========================
+-- TEST 12: TRIGGER trg_product_item_before_update
+-- ==========================
+SELECT '=== TEST 12: trg_product_item_before_update ===' AS test_name;
+
+SELECT 'Test 12.1: Update stock to negative (should fail)' AS test_case;
+-- Uncomment to test error:
+-- UPDATE ProductItem SET stock = -10 WHERE item_id = 1;
+-- Expected ERROR: Product item stock cannot be negative
+
+SELECT 'Test 12.2: Update price to negative (should fail)' AS test_case;
+-- Uncomment to test error:
+-- UPDATE ProductItem SET price = -1000 WHERE item_id = 1;
+-- Expected ERROR: Product item price cannot be negative
+
+SELECT 'Test 12.3: Valid update - increase stock' AS test_case;
+SELECT item_id, stock FROM ProductItem WHERE item_id = 1;
+-- Expected: stock = 50 (before update)
+
+UPDATE ProductItem SET stock = 150 WHERE item_id = 1;
+
+SELECT 'After update - stock increased:' AS info;
+SELECT item_id, stock FROM ProductItem WHERE item_id = 1;
+-- Expected: stock = 150 (successfully updated)
+
+-- Restore to original
+UPDATE ProductItem SET stock = 50 WHERE item_id = 1;
+
+-- ==========================
+-- CLEANUP TEST DATA
+-- ==========================
+SELECT '=== CLEANUP TEST DATA ===' AS title;
+
+-- Delete test reviews
+DELETE FROM Review WHERE customer_id = 3 AND target_type = 'Product' AND comment = 'Great T-Shirt quality!';
+DELETE FROM Review WHERE customer_id = 3 AND target_type = 'Shop' AND comment = 'Excellent shop service!';
+
+-- Delete test order and order items
+DELETE FROM OrderItem WHERE order_id = @test_order;
+DELETE FROM `Order` WHERE order_id = @test_order;
+
+-- Delete test accounts
+DELETE FROM Cart WHERE customer_id = @test_cust_id;
+DELETE FROM Customer WHERE customer_id = @test_cust_id;
+DELETE FROM Shop WHERE shop_id = @test_shop_id;
+DELETE FROM Admin WHERE admin_id = @test_admin_id;
+DELETE FROM Account WHERE account_id IN (@test_cust_id, @test_shop_id, @test_admin_id);
+
+-- Restore product/shop ratings to original values
+UPDATE Product SET rating = ROUND(fn_calculate_product_rating(product_id), 2);
+UPDATE Shop SET rating = ROUND(fn_calculate_shop_rating(shop_id), 2);
+
+SELECT 'Cleanup completed' AS info;
+
+-- ==========================
+-- FINAL VERIFICATION
+-- ==========================
+SELECT '=== FINAL VERIFICATION ===' AS title;
+
 SELECT 
-    'Functions' AS object_type,
-    COUNT(*) AS total_count
-FROM information_schema.ROUTINES
-WHERE ROUTINE_SCHEMA = 'ecommerce_db' AND ROUTINE_TYPE = 'FUNCTION'
-
-UNION ALL
-
-SELECT 
-    'Procedures' AS object_type,
-    COUNT(*) AS total_count
-FROM information_schema.ROUTINES
-WHERE ROUTINE_SCHEMA = 'ecommerce_db' AND ROUTINE_TYPE = 'PROCEDURE'
-
-UNION ALL
-
-SELECT 
-    'Triggers' AS object_type,
-    COUNT(*) AS total_count
-FROM information_schema.TRIGGERS
-WHERE TRIGGER_SCHEMA = 'ecommerce_db';
-
--- List all functions
-SELECT '' AS space;
-SELECT 'Functions:' AS list_header;
-SELECT ROUTINE_NAME 
-FROM information_schema.ROUTINES
-WHERE ROUTINE_SCHEMA = 'ecommerce_db' AND ROUTINE_TYPE = 'FUNCTION'
-ORDER BY ROUTINE_NAME;
-
--- List all procedures
-SELECT '' AS space;
-SELECT 'Procedures:' AS list_header;
-SELECT ROUTINE_NAME 
-FROM information_schema.ROUTINES
-WHERE ROUTINE_SCHEMA = 'ecommerce_db' AND ROUTINE_TYPE = 'PROCEDURE'
-ORDER BY ROUTINE_NAME;
-
--- List all triggers
-SELECT '' AS space;
-SELECT 'Triggers:' AS list_header;
-SELECT TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE
-FROM information_schema.TRIGGERS
-WHERE TRIGGER_SCHEMA = 'ecommerce_db'
-ORDER BY TRIGGER_NAME;
-
-SELECT '' AS space;
-SELECT '========================================' AS footer;
-SELECT '✅ ALL TESTS COMPLETED' AS footer;
-SELECT '========================================' AS footer;
+    (SELECT COUNT(*) FROM Account) AS total_accounts,
+    (SELECT COUNT(*) FROM Customer) AS total_customers,
+    (SELECT COUNT(*) FROM Shop) AS total_shops,
+    (SELECT COUNT(*) FROM Admin) AS total_admins,
+    (SELECT COUNT(*) FROM Product) AS total_products,
+    (SELECT COUNT(*) FROM Review) AS total_reviews,
+    (SELECT COUNT(*) FROM `Order`) AS total_orders,
+    (SELECT COUNT(*) FROM OrderItem) AS total_order_items;

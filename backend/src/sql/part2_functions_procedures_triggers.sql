@@ -35,11 +35,12 @@ BEGIN
     DECLARE v_discount DECIMAL(10, 2);
     DECLARE v_discount_type VARCHAR(20);
     DECLARE v_discount_value DECIMAL(10, 2);
+    DECLARE v_min_order_value DECIMAL(10, 2);
     DECLARE v_total DECIMAL(15, 2);
     
     -- Calculate subtotal from order items
     SELECT COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0)
-    INTO v_subtotal
+    INTO v_subtotal 
     FROM OrderItem oi
     WHERE oi.order_id = p_order_id;
     
@@ -50,19 +51,21 @@ BEGIN
     LEFT JOIN Shipping sh ON o.shipping_id = sh.shipping_id
     WHERE o.order_id = p_order_id;
     
-    -- Get voucher discount
-    SELECT v.discount_type, COALESCE(v.discount_value, 0)
-    INTO v_discount_type, v_discount_value
+    -- Get voucher discount with min_order_value check
+    SELECT v.discount_type, COALESCE(v.discount_value, 0), COALESCE(v.min_order_value, 0)
+    INTO v_discount_type, v_discount_value, v_min_order_value
     FROM `Order` o
     LEFT JOIN Voucher v ON o.voucher_id = v.voucher_id
     WHERE o.order_id = p_order_id;
     
-    -- Calculate discount amount
+    -- Calculate discount amount (only if subtotal meets minimum requirement)
     SET v_discount = 0;
-    IF v_discount_type = 'Percentage' THEN
-        SET v_discount = v_subtotal * (v_discount_value / 100);
-    ELSEIF v_discount_type = 'Amount' THEN
-        SET v_discount = v_discount_value;
+    IF v_discount_type IS NOT NULL AND v_subtotal >= v_min_order_value THEN
+        IF v_discount_type = 'Percentage' THEN
+            SET v_discount = v_subtotal * (v_discount_value / 100);
+        ELSEIF v_discount_type = 'Amount' THEN
+            SET v_discount = v_discount_value;
+        END IF;
     END IF;
     
     -- Calculate total = subtotal + shipping - discount
@@ -104,7 +107,6 @@ READS SQL DATA
 BEGIN
     DECLARE v_revenue DECIMAL(15, 2);
     DECLARE v_subtotal DECIMAL(15, 2);
-    DECLARE v_shipping_total DECIMAL(15, 2);
     DECLARE v_discount_total DECIMAL(15, 2);
     
     -- Tính tổng doanh thu shop (OrderItem + Shipping - Voucher discount)
@@ -117,23 +119,13 @@ BEGIN
     INNER JOIN `Order` o ON oi.order_id = o.order_id
     WHERE oi.shop_id = p_shop_id AND o.status != 'Cancelled';
     
-    -- Tính shipping fees (chia đều cho các shop nếu 1 order có nhiều shop)
-    SELECT COALESCE(SUM(s.fee), 0)
-    INTO v_shipping_total
-    FROM `Order` o
-    INNER JOIN Shipping s ON o.shipping_id = s.shipping_id
-    WHERE o.order_id IN (
-        SELECT DISTINCT oi.order_id 
-        FROM OrderItem oi 
-        WHERE oi.shop_id = p_shop_id
-    )
-    AND o.status != 'Cancelled';
-    
-    -- Tính voucher discount (chia đều cho các shop nếu 1 order có nhiều shop)
+    -- Tính voucher discount (chỉ áp dụng nếu đủ min_order_value)
     SELECT COALESCE(SUM(
         CASE 
-            WHEN v.discount_type = 'Percentage' THEN v_subtotal * v.discount_value / 100
-            WHEN v.discount_type = 'Amount' THEN v.discount_value
+            WHEN v.discount_type = 'Percentage' AND v_subtotal >= COALESCE(v.min_order_value, 0) 
+                 THEN v_subtotal * v.discount_value / 100
+            WHEN v.discount_type = 'Amount' AND v_subtotal >= COALESCE(v.min_order_value, 0)
+                 THEN v.discount_value
             ELSE 0
         END
     ), 0)
@@ -147,7 +139,7 @@ BEGIN
     )
     AND o.status != 'Cancelled';
     
-    SET v_revenue = v_subtotal + v_shipping_total - v_discount_total;
+    SET v_revenue = v_subtotal - v_discount_total;
     
     IF v_revenue < 0 THEN
         SET v_revenue = 0;
@@ -176,6 +168,76 @@ BEGIN
       AND r.target_id = p_shop_id;
     
     RETURN v_avg_rating;
+END$$
+
+-- ---------------------------------------------
+-- FUNCTION 5: Calculate Product Rating
+-- Tính rating trung bình của product từ reviews
+-- SELECT từ 2 bảng: review, product
+-- ---------------------------------------------
+CREATE FUNCTION fn_calculate_product_rating(p_product_id INT)
+RETURNS DECIMAL(3, 2)
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE v_avg_rating DECIMAL(3, 2);
+    
+    SELECT COALESCE(AVG(r.rating), 0)
+    INTO v_avg_rating
+    FROM Review r
+    WHERE r.target_type = 'Product'
+      AND r.target_id = p_product_id;
+    
+    RETURN v_avg_rating;
+END$$
+
+-- ---------------------------------------------
+-- FUNCTION 6: Get Order Total Items with Cursor & Loop
+-- Tính tổng số lượng items trong 1 order bằng CURSOR + LOOP
+-- Dùng cursor để lặp qua từng OrderItem
+-- SELECT từ 2 bảng: order_item, order
+-- ---------------------------------------------
+CREATE FUNCTION fn_get_order_total_items_with_cursor(p_order_id INT)
+RETURNS INT
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE v_total_items INT DEFAULT 0;
+    DECLARE v_done INT DEFAULT FALSE;
+    DECLARE v_item_quantity INT;
+    
+    -- Declare cursor for OrderItems
+    DECLARE order_items_cursor CURSOR FOR
+        SELECT quantity
+        FROM OrderItem
+        WHERE order_id = p_order_id;
+    
+    -- Declare continue handler for cursor
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = TRUE;
+    
+    -- Validate order exists
+    IF NOT EXISTS (SELECT 1 FROM `Order` WHERE order_id = p_order_id) THEN
+        RETURN 0;
+    END IF;
+    
+    -- Open cursor
+    OPEN order_items_cursor;
+    
+    -- Loop through each item
+    item_loop: LOOP
+        FETCH order_items_cursor INTO v_item_quantity;
+        
+        IF v_done THEN
+            LEAVE item_loop;
+        END IF;
+        
+        SET v_total_items = v_total_items + v_item_quantity;
+    END LOOP item_loop;
+    
+    -- Close cursor
+    CLOSE order_items_cursor;
+    
+    RETURN v_total_items;
 END$$
 
 DELIMITER ;
@@ -364,8 +426,8 @@ BEGIN
     LEFT JOIN OrderItem oi ON s.shop_id = oi.shop_id
     LEFT JOIN `Order` o ON oi.order_id = o.order_id
         AND o.order_date BETWEEN p_from_date AND DATE_ADD(p_to_date, INTERVAL 1 DAY)
-        AND o.status != 'Cancelled'
     WHERE s.shop_id = p_shop_id
+      AND (o.order_id IS NULL OR o.status != 'Cancelled')
     GROUP BY s.shop_id, s.shop_name;
     
     -- Top selling product items
@@ -380,9 +442,9 @@ BEGIN
     INNER JOIN ProductItem pi ON p.product_id = pi.product_id
     INNER JOIN OrderItem oi ON pi.item_id = oi.item_id
     INNER JOIN `Order` o ON oi.order_id = o.order_id
+        AND o.status != 'Cancelled'
+        AND o.order_date BETWEEN p_from_date AND DATE_ADD(p_to_date, INTERVAL 1 DAY)
     WHERE pi.shop_id = p_shop_id
-      AND o.order_date BETWEEN p_from_date AND DATE_ADD(p_to_date, INTERVAL 1 DAY)
-      AND o.status != 'Cancelled'
     GROUP BY p.product_name, pi.color, pi.type
     ORDER BY item_revenue DESC
     LIMIT 10;
@@ -639,6 +701,8 @@ DROP TRIGGER IF EXISTS trg_review_before_insert;
 DROP TRIGGER IF EXISTS trg_review_after_insert;
 DROP TRIGGER IF EXISTS trg_product_item_before_update;
 DROP TRIGGER IF EXISTS trg_account_after_insert;
+DROP TRIGGER IF EXISTS trg_customer_before_insert;
+DROP TRIGGER IF EXISTS trg_shop_before_insert;
 
 DELIMITER $$
 
@@ -783,6 +847,16 @@ BEGIN
         UPDATE Shop
         SET rating = COALESCE(v_avg_rating, 0)
         WHERE shop_id = NEW.target_id;
+    
+    ELSEIF NEW.target_type = 'Product' THEN
+        -- Update product rating
+        SELECT AVG(rating) INTO v_avg_rating
+        FROM Review
+        WHERE target_type = 'Product' AND target_id = NEW.target_id;
+        
+        UPDATE Product
+        SET rating = COALESCE(v_avg_rating, 0)
+        WHERE product_id = NEW.target_id;
     END IF;
 END$$
 
@@ -837,74 +911,233 @@ BEGIN
     END IF;
 END$$
 
-DELIMITER ;
+-- ---------------------------------------------
+-- TRIGGER 7: Customer Before Insert
+-- Auto-generate customer_code with CUST prefix (CUST00001, CUST00002, ...)
+-- Row-based constraint: links customer_code with customer_id
+-- ---------------------------------------------
+CREATE TRIGGER trg_customer_before_insert
+BEFORE INSERT ON Customer
+FOR EACH ROW
+BEGIN
+    -- Generate customer_code from customer_id
+    SET NEW.customer_code = CONCAT('CUST', LPAD(NEW.customer_id, 5, '0'));
+END$$
+
+-- ---------------------------------------------
+-- TRIGGER 8: Shop Before Insert
+-- Auto-generate shop_code with SHOP prefix (SHOP00001, SHOP00002, ...)
+-- Row-based constraint: links shop_code with shop_id
+-- ---------------------------------------------
+CREATE TRIGGER trg_shop_before_insert
+BEFORE INSERT ON Shop
+FOR EACH ROW
+BEGIN
+    -- Generate shop_code from shop_id
+    SET NEW.shop_code = CONCAT('SHOP', LPAD(NEW.shop_id, 5, '0'));
+END$$
 
 -- =============================================
--- TEST QUERIES
+-- CRUD PROCEDURES (Add/Update/Delete)
 -- =============================================
 
--- Test Function 1: Calculate Order Total
-SELECT 
-    order_id,
-    fn_calculate_order_total(order_id) AS calculated_total,
-    total_amount
-FROM `Order`
-LIMIT 5;
+-- ==== PRODUCT CRUD ====
 
--- Test Function 2: Get Customer Total Spent
-SELECT 
-    c.customer_id,
-    a.full_name,
-    fn_get_customer_total_spent(c.customer_id) AS calculated_spent,
-    c.total_spent
-FROM Customer c
-INNER JOIN Account a ON c.customer_id = a.account_id
-LIMIT 5;
+-- sp_add_product: INSERT new product
+-- Returns: product_id if success, -1 if error
+CREATE PROCEDURE sp_add_product(
+    IN p_shop_id INT,
+    IN p_category_id INT,
+    IN p_product_name VARCHAR(255),
+    IN p_description TEXT,
+    IN p_image VARCHAR(255),
+    OUT p_product_id INT,
+    OUT p_status VARCHAR(50)
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_product_id = -1;
+        SET p_status = 'Error: Invalid shop or category ID';
+    END;
+    
+    SET p_product_id = -1;
+    SET p_status = 'Error';
+    
+    -- Validate shop exists
+    IF NOT EXISTS (SELECT 1 FROM Shop WHERE shop_id = p_shop_id) THEN
+        SET p_status = 'Error: Shop not found';
+    ELSEIF NOT EXISTS (SELECT 1 FROM Category WHERE category_id = p_category_id) THEN
+        SET p_status = 'Error: Category not found';
+    ELSE
+        -- Insert product
+        INSERT INTO Product (shop_id, category_id, product_name, description, image, status)
+        VALUES (p_shop_id, p_category_id, p_product_name, p_description, p_image, 'In stock');
+        
+        SET p_product_id = LAST_INSERT_ID();
+        SET p_status = 'Success';
+    END IF;
+END$$
 
--- Test Function 3: Get Shop Revenue
-SELECT 
-    s.shop_id,
-    s.shop_name,
-    fn_get_shop_revenue(s.shop_id) AS total_revenue
-FROM Shop s
-ORDER BY fn_get_shop_revenue(s.shop_id) DESC;
+-- sp_update_product: UPDATE product info
+CREATE PROCEDURE sp_update_product(
+    IN p_product_id INT,
+    IN p_product_name VARCHAR(255),
+    IN p_description TEXT,
+    IN p_image VARCHAR(255),
+    IN p_status VARCHAR(50),
+    OUT p_success BOOLEAN,
+    OUT p_message VARCHAR(100)
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_success = FALSE;
+        SET p_message = 'Error: Database error';
+    END;
+    
+    IF NOT EXISTS (SELECT 1 FROM Product WHERE product_id = p_product_id) THEN
+        SET p_success = FALSE;
+        SET p_message = 'Error: Product not found';
+    ELSE
+        UPDATE Product
+        SET product_name = COALESCE(p_product_name, product_name),
+            description = COALESCE(p_description, description),
+            image = COALESCE(p_image, image),
+            status = COALESCE(p_status, status)
+        WHERE product_id = p_product_id;
+        
+        SET p_success = TRUE;
+        SET p_message = 'Product updated successfully';
+    END IF;
+END$$
 
--- Test Function 4: Calculate Shop Rating
-SELECT 
-    s.shop_id,
-    s.shop_name,
-    fn_calculate_shop_rating(s.shop_id) AS calculated_rating,
-    s.rating AS stored_rating
-FROM Shop s;
+-- sp_delete_product: DELETE product and all related items
+CREATE PROCEDURE sp_delete_product(
+    IN p_product_id INT,
+    OUT p_success BOOLEAN,
+    OUT p_message VARCHAR(100)
+)
+BEGIN
+    DECLARE v_affected_items INT;
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_success = FALSE;
+        SET p_message = 'Error: Database error';
+    END;
+    
+    IF NOT EXISTS (SELECT 1 FROM Product WHERE product_id = p_product_id) THEN
+        SET p_success = FALSE;
+        SET p_message = 'Error: Product not found';
+    ELSE
+        -- Get count of affected items
+        SELECT COUNT(*) INTO v_affected_items FROM ProductItem WHERE product_id = p_product_id;
+        
+        -- Delete product (CASCADE deletes ProductItems)
+        DELETE FROM Product WHERE product_id = p_product_id;
+        
+        SET p_success = TRUE;
+        SET p_message = CONCAT('Product deleted. Removed ', v_affected_items, ' variant(s)');
+    END IF;
+END$$
 
--- Test Procedure 1: Get Shop Revenue Report
-CALL sp_get_shop_revenue_report(4, '2025-01-01', '2025-12-31');
+-- ==== PRODUCT ITEM (VARIANT) CRUD ====
 
--- Test Procedure 3: Get Product Statistics
-CALL sp_get_product_statistics(NULL, NULL, NULL, NULL);
+-- sp_add_product_item: INSERT product variant
+CREATE PROCEDURE sp_add_product_item(
+    IN p_product_id INT,
+    IN p_shop_id INT,
+    IN p_color VARCHAR(50),
+    IN p_type VARCHAR(50),
+    IN p_price DECIMAL(15,2),
+    IN p_stock INT,
+    IN p_image_url VARCHAR(255),
+    OUT p_item_id INT,
+    OUT p_status VARCHAR(50)
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_item_id = -1;
+        SET p_status = 'Error: Invalid input';
+    END;
+    
+    SET p_item_id = -1;
+    SET p_status = 'Error';
+    
+    IF NOT EXISTS (SELECT 1 FROM Product WHERE product_id = p_product_id) THEN
+        SET p_status = 'Error: Product not found';
+    ELSEIF p_price <= 0 THEN
+        SET p_status = 'Error: Price must be > 0';
+    ELSEIF p_stock < 0 THEN
+        SET p_status = 'Error: Stock cannot be negative';
+    ELSE
+        INSERT INTO ProductItem (product_id, shop_id, color, type, price, stock, image_url)
+        VALUES (p_product_id, p_shop_id, p_color, p_type, p_price, p_stock, p_image_url);
+        
+        SET p_item_id = LAST_INSERT_ID();
+        SET p_status = 'Success';
+    END IF;
+END$$
 
--- Test Procedure 4: Apply Voucher
-CALL sp_apply_voucher('DISCOUNT10', 600000, @discount, @valid, @message);
-SELECT @discount AS discount_amount, @valid AS is_valid, @message AS message;
+-- sp_update_product_item: UPDATE variant
+CREATE PROCEDURE sp_update_product_item(
+    IN p_item_id INT,
+    IN p_price DECIMAL(15,2),
+    IN p_stock INT,
+    IN p_image_url VARCHAR(255),
+    OUT p_success BOOLEAN,
+    OUT p_message VARCHAR(100)
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_success = FALSE;
+        SET p_message = 'Error: Database error';
+    END;
+    
+    IF NOT EXISTS (SELECT 1 FROM ProductItem WHERE item_id = p_item_id) THEN
+        SET p_success = FALSE;
+        SET p_message = 'Error: Item not found';
+    ELSEIF p_price IS NOT NULL AND p_price <= 0 THEN
+        SET p_success = FALSE;
+        SET p_message = 'Error: Price must be > 0';
+    ELSEIF p_stock IS NOT NULL AND p_stock < 0 THEN
+        SET p_success = FALSE;
+        SET p_message = 'Error: Stock cannot be negative';
+    ELSE
+        UPDATE ProductItem
+        SET price = COALESCE(p_price, price),
+            stock = COALESCE(p_stock, stock),
+            image_url = COALESCE(p_image_url, image_url)
+        WHERE item_id = p_item_id;
+        
+        SET p_success = TRUE;
+        SET p_message = 'Item updated successfully';
+    END IF;
+END$$
 
--- =============================================
--- TEST QUERIES FOR CATEGORY RECURSION
--- =============================================
-
--- Test Recursion 1: Get Full Category Hierarchy
--- Hiển thị toàn bộ cây danh mục từ root xuống leaf
-CALL sp_get_category_hierarchy();
-
--- Test Recursion 2: Get All Children of Electronics
--- Nhập category_id = 1 (Electronics)
--- Output: Phones (level 1), Laptops (level 1), và tất cả con cháu
-CALL sp_get_category_all_children(1);
-
--- Test Recursion 3: Get All Parents of Phones
--- Nhập category_id = 3 (Phones)
--- Output: Electronics (cha), NULL (root)
-CALL sp_get_category_all_parents(3);
-
--- =============================================
--- End of Functions, Procedures, and Triggers Script
--- =============================================
+-- sp_delete_product_item: DELETE variant
+CREATE PROCEDURE sp_delete_product_item(
+    IN p_item_id INT,
+    OUT p_success BOOLEAN,
+    OUT p_message VARCHAR(100)
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_success = FALSE;
+        SET p_message = 'Error: Database error';
+    END;
+    
+    IF NOT EXISTS (SELECT 1 FROM ProductItem WHERE item_id = p_item_id) THEN
+        SET p_success = FALSE;
+        SET p_message = 'Error: Item not found';
+    ELSE
+        DELETE FROM ProductItem WHERE item_id = p_item_id;
+        
+        SET p_success = TRUE;
+        SET p_message = 'Item deleted successfully';
+    END IF;
+END$$
