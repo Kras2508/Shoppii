@@ -13,20 +13,23 @@ const ProductFormPage = () => {
   const isEditing = Boolean(productId);
 
   const [loading, setLoading] = useState(isEditing);
-  const [dragActive, setDragActive] = useState(false);
 
-  // Form state
+  // Form state - theo đúng database schema
   const [formData, setFormData] = useState({
     product_name: '',
     description: '',
     category_id: '',
-    price: '',
-    oldPrice: '',
-    stock: '',
-    status: 'Active',
-    images: [],
-    colors: [''],
-    sizes: ['']
+    image: '', // Product main image
+    status: 'In stock',
+    variants: [
+      {
+        color: '',
+        type: '',
+        price: '',
+        stock: '',
+        image_url: ''
+      }
+    ]
   });
 
   const [errors, setErrors] = useState({});
@@ -39,7 +42,6 @@ const ProductFormPage = () => {
         const { categoryService } = await import('../../api/categoryService');
         const response = await categoryService.getCategories();
         if (response.data?.data) {
-          // Backend returns either flat or categories tree
           const catList = response.data.data.flat || response.data.data.categories || response.data.data;
           const flatCategories = Array.isArray(catList) ? catList : [];
           setCategories(flatCategories.map(cat => ({
@@ -63,27 +65,27 @@ const ProductFormPage = () => {
           const response = await productService.getProductById(productId);
           if (response.data?.data) {
             const product = response.data.data;
-            
-            // Parse variants from backend
             const variants = product.variants || [];
-            const colors = [...new Set(variants.map(v => v.color))].filter(c => c);
-            const sizes = [...new Set(variants.map(v => v.type))].filter(s => s);
-            const images = variants.map(v => v.image_url).filter(img => img);
-            
-            // Get price and stock from first variant
-            const firstVariant = variants[0];
             
             setFormData({
               product_name: product.product_name || '',
               description: product.description || '',
               category_id: product.category_id?.toString() || '',
-              price: (firstVariant?.price || 0).toString(),
-              oldPrice: (product.old_price || 0).toString(),
-              stock: (firstVariant?.stock || 0).toString(),
-              status: product.status || 'Active',
-              images: images.length > 0 ? images : [],
-              colors: colors.length > 0 ? colors : [''],
-              sizes: sizes.length > 0 ? sizes : ['']
+              image: product.image || '',
+              status: product.status || 'In stock',
+              variants: variants.length > 0 ? variants.map(v => ({
+                color: v.color || '',
+                type: v.type || '',
+                price: v.price?.toString() || '',
+                stock: v.stock?.toString() || '',
+                image_url: v.image_url || ''
+              })) : [{
+                color: '',
+                type: '',
+                price: '',
+                stock: '',
+                image_url: ''
+              }]
             });
           }
         } catch (err) {
@@ -107,103 +109,64 @@ const ProductFormPage = () => {
     }
   };
 
-  const handleImageUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    for (const file of files) {
-      try {
-        const formData = new FormData();
-        formData.append('image', file);
-        
-        const response = await privateClient.post('/products/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        
-        if (response.data?.success && response.data?.data?.url) {
-          // Build full image URL
-          const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-          const fullImageUrl = baseURL.replace('/api', '') + response.data.data.url;
-          
-          setFormData(prev => ({
-            ...prev,
-            images: [...prev.images, fullImageUrl].slice(0, 8)
-          }));
-        }
-      } catch (error) {
-        console.error('Image upload error:', error);
-        alert('Failed to upload image: ' + error.message);
-      }
-    }
-  };
-
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-    
-    files.forEach(file => {
-      const formData = new FormData();
-      formData.append('image', file);
-      
-      privateClient.post('/products/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-        .then(response => {
-          if (response.data?.success && response.data?.data?.url) {
-            // Build full image URL
-            const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-            const fullImageUrl = baseURL.replace('/api', '') + response.data.data.url;
-            
-            setFormData(prev => ({
-              ...prev,
-              images: [...prev.images, fullImageUrl].slice(0, 8)
-            }));
-          }
-        })
-        .catch(error => {
-          console.error('Image upload error:', error);
-          alert('Failed to upload image: ' + error.message);
-        });
-    });
-  };
-
-  const removeImage = (index) => {
+  const handleVariantChange = (index, field, value) => {
     setFormData(prev => ({
       ...prev,
-      images: prev.images.filter((_, i) => i !== index)
+      variants: prev.variants.map((v, i) => 
+        i === index ? { ...v, [field]: value } : v
+      )
     }));
   };
 
-  const handleVariantChange = (type, index, value) => {
+  const addVariant = () => {
     setFormData(prev => ({
       ...prev,
-      [type]: prev[type].map((item, i) => i === index ? value : item)
+      variants: [...prev.variants, {
+        color: '',
+        type: '',
+        price: '',
+        stock: '',
+        image_url: ''
+      }]
     }));
   };
 
-  const addVariant = (type) => {
-    setFormData(prev => ({
-      ...prev,
-      [type]: [...prev[type], '']
-    }));
-  };
-
-  const removeVariant = (type, index) => {
-    if (formData[type].length > 1) {
+  const removeVariant = (index) => {
+    if (formData.variants.length > 1) {
       setFormData(prev => ({
         ...prev,
-        [type]: prev[type].filter((_, i) => i !== index)
+        variants: prev.variants.filter((_, i) => i !== index)
       }));
+    }
+  };
+
+  const handleImageUpload = async (e, variantIndex = null) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('image', file);
+      
+      const response = await privateClient.post('/products/upload', formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      if (response.data?.success && response.data?.data?.url) {
+        const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        const fullImageUrl = baseURL.replace('/api', '') + response.data.data.url;
+        
+        if (variantIndex !== null) {
+          // Upload for variant
+          handleVariantChange(variantIndex, 'image_url', fullImageUrl);
+        } else {
+          // Upload for main product image
+          setFormData(prev => ({ ...prev, image: fullImageUrl }));
+        }
+      }
+    } catch (error) {
+      console.error('Image upload error:', error);
+      alert('Failed to upload image: ' + error.message);
     }
   };
 
@@ -211,9 +174,15 @@ const ProductFormPage = () => {
     const newErrors = {};
     if (!formData.product_name.trim()) newErrors.product_name = 'Please enter product name';
     if (!formData.category_id) newErrors.category_id = 'Please select a category';
-    if (!formData.price || parseInt(formData.price) <= 0) newErrors.price = 'Please enter a valid price';
-    if (!formData.stock || parseInt(formData.stock) < 0) newErrors.stock = 'Please enter stock quantity';
-    if (formData.images.length === 0) newErrors.images = 'Please add at least one image';
+    
+    // Validate variants
+    formData.variants.forEach((variant, index) => {
+      if (!variant.color.trim()) newErrors[`variant_${index}_color`] = 'Color is required';
+      if (!variant.type.trim()) newErrors[`variant_${index}_type`] = 'Type is required';
+      if (!variant.price || parseFloat(variant.price) <= 0) newErrors[`variant_${index}_price`] = 'Valid price required';
+      if (variant.stock === '' || parseInt(variant.stock) < 0) newErrors[`variant_${index}_stock`] = 'Stock required';
+    });
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -227,21 +196,21 @@ const ProductFormPage = () => {
         category_id: parseInt(formData.category_id),
         product_name: formData.product_name,
         description: formData.description,
-        variants: formData.colors.filter(c => c.trim()).map((color, idx) => ({
-          color,
-          type: formData.sizes[idx] || 'Standard',
-          price: parseInt(formData.price),
-          stock: parseInt(formData.stock),
-          image_url: formData.images[idx] || null
+        image: formData.image,
+        status: formData.status,
+        variants: formData.variants.map(v => ({
+          color: v.color,
+          type: v.type,
+          price: parseFloat(v.price),
+          stock: parseInt(v.stock),
+          image_url: v.image_url || null
         }))
       };
 
       if (isEditing) {
-        // Update existing product
         await productService.updateProduct(productId, productData, privateClient);
         alert('Product updated successfully!');
       } else {
-        // Create new product
         await productService.createProduct(productData, privateClient);
         alert('Product created successfully!');
       }
@@ -253,7 +222,6 @@ const ProductFormPage = () => {
   };
 
   if (!isAuthenticated) {
-    navigate('/signin');
     return null;
   }
 
@@ -287,7 +255,7 @@ const ProductFormPage = () => {
 
         <form onSubmit={handleSubmit}>
           <div style={shopStyles.formGrid}>
-            {/* Left Column - Main Info */}
+            {/* Left Column */}
             <div>
               {/* Basic Info */}
               <div style={shopStyles.card}>
@@ -340,271 +308,158 @@ const ProductFormPage = () => {
                     value={formData.description}
                     onChange={handleInputChange}
                     placeholder="Detail description about product..."
+                    rows="4"
                   />
                 </div>
-              </div>
 
-              {/* Images - Upload */}
-              <div style={shopStyles.card}>
-                <h3 style={shopStyles.cardTitle}>
-                  🖼️ Product Images <span style={{ color: '#dc3545' }}>*</span>
-                </h3>
-                
-                <div
-                  style={{
-                    border: '2px dashed #ddd',
-                    borderRadius: '8px',
-                    padding: '40px',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    backgroundColor: dragActive ? '#f0f7f1' : 'white',
-                    borderColor: errors.images ? '#dc3545' : (dragActive ? '#647A67' : '#ddd'),
-                    transition: 'all 0.2s'
-                  }}
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
-                  onClick={() => document.getElementById('image-input').click()}
-                >
+                <div style={shopStyles.formSection}>
+                  <label style={shopStyles.formLabel}>Main Product Image</label>
                   <input
-                    id="image-input"
                     type="file"
                     accept="image/*"
-                    multiple
-                    style={{ display: 'none' }}
-                    onChange={handleImageUpload}
+                    onChange={(e) => handleImageUpload(e, null)}
+                    style={{ display: 'block', marginBottom: '8px' }}
                   />
-                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>📷</div>
-                  <p style={{ color: '#333', marginBottom: '4px', fontWeight: '500' }}>
-                    Drag and drop images here or click to select
-                  </p>
-                  <p style={{ fontSize: '12px', color: '#999' }}>
-                    JPG, PNG or WebP. Max 5MB per file. Up to 8 images.
-                  </p>
+                  {formData.image && (
+                    <img src={formData.image} alt="Product" style={{ maxWidth: '200px', borderRadius: '8px', marginTop: '8px' }} />
+                  )}
                 </div>
-
-                {formData.images.length > 0 && (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                    gap: '12px',
-                    marginTop: '16px'
-                  }}>
-                    {formData.images.map((url, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          position: 'relative',
-                          borderRadius: '8px',
-                          overflow: 'hidden',
-                          backgroundColor: '#f0f0f0',
-                          aspectRatio: '1',
-                          border: index === 0 ? '2px solid #647A67' : '1px solid #ddd'
-                        }}
-                      >
-                        <img
-                          src={url}
-                          alt={`Preview ${index}`}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover'
-                          }}
-                        />
-                        <button
-                          type="button"
-                          style={{
-                            position: 'absolute',
-                            top: '4px',
-                            right: '4px',
-                            backgroundColor: 'rgba(220, 53, 69, 0.9)',
-                            color: 'white',
-                            border: 'none',
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                          onClick={() => removeImage(index)}
-                        >
-                          ✕
-                        </button>
-                        {index === 0 && (
-                          <div style={{
-                            position: 'absolute',
-                            bottom: '4px',
-                            left: '4px',
-                            backgroundColor: '#647A67',
-                            color: 'white',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            fontSize: '10px',
-                            fontWeight: '500'
-                          }}>
-                            Main
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {errors.images && <div style={shopStyles.formError}>{errors.images}</div>}
               </div>
 
               {/* Variants */}
               <div style={shopStyles.card}>
                 <h3 style={shopStyles.cardTitle}>🎨 Variants</h3>
                 
-                {/* Colors */}
-                <div style={shopStyles.formSection}>
-                  <label style={shopStyles.formLabel}>Colors</label>
-                  <div style={shopStyles.variantSection}>
-                    {formData.colors.map((color, index) => (
-                      <div key={index} style={shopStyles.variantRow}>
-                        <input
-                          type="text"
-                          style={shopStyles.variantInput}
-                          value={color}
-                          onChange={(e) => handleVariantChange('colors', index, e.target.value)}
-                          placeholder="e.g., White, Black, Blue..."
-                        />
+                {formData.variants.map((variant, index) => (
+                  <div key={index} style={{
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '16px',
+                    backgroundColor: '#f9f9f9'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <strong>Variant {index + 1}</strong>
+                      {formData.variants.length > 1 && (
                         <button
                           type="button"
-                          style={shopStyles.iconBtn}
-                          onClick={() => removeVariant('colors', index)}
-                          disabled={formData.colors.length <= 1}
+                          onClick={() => removeVariant(index)}
+                          style={{
+                            backgroundColor: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
                         >
                           Delete
                         </button>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      style={shopStyles.addVariantBtn}
-                      onClick={() => addVariant('colors')}
-                    >
-                      More Colors
-                    </button>
-                  </div>
-                </div>
+                      )}
+                    </div>
 
-                {/* Sizes */}
-                <div style={shopStyles.formSection}>
-                  <label style={shopStyles.formLabel}>Sizes</label>
-                  <div style={shopStyles.variantSection}>
-                    {formData.sizes.map((size, index) => (
-                      <div key={index} style={shopStyles.variantRow}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={shopStyles.formLabel}>Color *</label>
                         <input
                           type="text"
-                          style={shopStyles.variantInput}
-                          value={size}
-                          onChange={(e) => handleVariantChange('sizes', index, e.target.value)}
-                          placeholder="VD: S, M, L, XL..."
+                          value={variant.color}
+                          onChange={(e) => handleVariantChange(index, 'color', e.target.value)}
+                          placeholder="e.g., White, Black, Blue"
+                          style={{
+                            ...shopStyles.formInput,
+                            borderColor: errors[`variant_${index}_color`] ? '#dc3545' : '#ddd'
+                          }}
                         />
-                        <button
-                          type="button"
-                          style={shopStyles.iconBtn}
-                          onClick={() => removeVariant('sizes', index)}
-                          disabled={formData.sizes.length <= 1}
-                        >
-                          Delete
-                        </button>
+                        {errors[`variant_${index}_color`] && <div style={shopStyles.formError}>{errors[`variant_${index}_color`]}</div>}
                       </div>
-                    ))}
-                    <button
-                      type="button"
-                      style={shopStyles.addVariantBtn}
-                      onClick={() => addVariant('sizes')}
-                    >
-                      More Sizes
-                    </button>
+
+                      <div>
+                        <label style={shopStyles.formLabel}>Type *</label>
+                        <input
+                          type="text"
+                          value={variant.type}
+                          onChange={(e) => handleVariantChange(index, 'type', e.target.value)}
+                          placeholder="e.g., S, M, L, XL"
+                          style={{
+                            ...shopStyles.formInput,
+                            borderColor: errors[`variant_${index}_type`] ? '#dc3545' : '#ddd'
+                          }}
+                        />
+                        {errors[`variant_${index}_type`] && <div style={shopStyles.formError}>{errors[`variant_${index}_type`]}</div>}
+                      </div>
+
+                      <div>
+                        <label style={shopStyles.formLabel}>Price (VND) *</label>
+                        <input
+                          type="number"
+                          value={variant.price}
+                          onChange={(e) => handleVariantChange(index, 'price', e.target.value)}
+                          placeholder="0"
+                          min="0"
+                          style={{
+                            ...shopStyles.formInput,
+                            borderColor: errors[`variant_${index}_price`] ? '#dc3545' : '#ddd'
+                          }}
+                        />
+                        {errors[`variant_${index}_price`] && <div style={shopStyles.formError}>{errors[`variant_${index}_price`]}</div>}
+                      </div>
+
+                      <div>
+                        <label style={shopStyles.formLabel}>Stock *</label>
+                        <input
+                          type="number"
+                          value={variant.stock}
+                          onChange={(e) => handleVariantChange(index, 'stock', e.target.value)}
+                          placeholder="0"
+                          min="0"
+                          style={{
+                            ...shopStyles.formInput,
+                            borderColor: errors[`variant_${index}_stock`] ? '#dc3545' : '#ddd'
+                          }}
+                        />
+                        {errors[`variant_${index}_stock`] && <div style={shopStyles.formError}>{errors[`variant_${index}_stock`]}</div>}
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '12px' }}>
+                      <label style={shopStyles.formLabel}>Variant Image</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, index)}
+                        style={{ display: 'block', marginBottom: '8px' }}
+                      />
+                      {variant.image_url && (
+                        <img src={variant.image_url} alt={`Variant ${index + 1}`} style={{ maxWidth: '150px', borderRadius: '8px', marginTop: '8px' }} />
+                      )}
+                    </div>
                   </div>
-                </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addVariant}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    backgroundColor: '#647A67',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  ➕ Add Variant
+                </button>
               </div>
             </div>
 
-            {/* Right Column - Price & Status */}
+            {/* Right Column */}
             <div>
-              {/* Pricing */}
-              <div style={shopStyles.card}>
-                <h3 style={shopStyles.cardTitle}>💰 Price</h3>
-                
-                <div style={shopStyles.formSection}>
-                  <label style={shopStyles.formLabel}>
-                    Price <span style={{ color: '#dc3545' }}>*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="price"
-                    style={{
-                      ...shopStyles.formInput,
-                      borderColor: errors.price ? '#dc3545' : '#ddd'
-                    }}
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    min="0"
-                  />
-                  {errors.price && <div style={shopStyles.formError}>{errors.price}</div>}
-                  <div style={shopStyles.formHelper}>Unit: VND</div>
-                </div>
-
-                <div style={shopStyles.formSection}>
-                  <label style={shopStyles.formLabel}>Original Price (before discount)</label>
-                  <input
-                    type="number"
-                    name="oldPrice"
-                    style={shopStyles.formInput}
-                    value={formData.oldPrice}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    min="0"
-                  />
-                  <div style={shopStyles.formHelper}>Leave blank if no discount</div>
-                </div>
-
-                {formData.oldPrice && parseInt(formData.oldPrice) > parseInt(formData.price || 0) && (
-                  <div style={{
-                    backgroundColor: '#d4edda',
-                    padding: '12px',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    color: '#155724'
-                  }}>
-                    🏷️ Discount: {Math.round((1 - parseInt(formData.price || 0) / parseInt(formData.oldPrice)) * 100)}%
-                  </div>
-                )}
-              </div>
-
-              {/* Stock */}
-              <div style={shopStyles.card}>
-                <h3 style={shopStyles.cardTitle}>📦 Kho hàng</h3>
-                
-                <div style={shopStyles.formSection}>
-                  <label style={shopStyles.formLabel}>
-                    Stock <span style={{ color: '#dc3545' }}>*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="stock"
-                    style={{
-                      ...shopStyles.formInput,
-                      borderColor: errors.stock ? '#dc3545' : '#ddd'
-                    }}
-                    value={formData.stock}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    min="0"
-                  />
-                  {errors.stock && <div style={shopStyles.formError}>{errors.stock}</div>}
-                </div>
-              </div>
-
               {/* Status */}
               <div style={shopStyles.card}>
                 <h3 style={shopStyles.cardTitle}>Status</h3>
@@ -617,8 +472,8 @@ const ProductFormPage = () => {
                     value={formData.status}
                     onChange={handleInputChange}
                   >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
+                    <option value="In stock">In stock</option>
+                    <option value="Out of stock">Out of stock</option>
                   </select>
                 </div>
               </div>
@@ -627,16 +482,27 @@ const ProductFormPage = () => {
               <div style={shopStyles.card}>
                 <button
                   type="submit"
-                  style={{ ...shopStyles.primaryBtn, width: '100%', justifyContent: 'center' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#556B5A'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#647A67'}
+                  style={{ 
+                    ...shopStyles.primaryBtn, 
+                    width: '100%', 
+                    justifyContent: 'center',
+                    padding: '14px',
+                    fontSize: '16px',
+                    fontWeight: '600'
+                  }}
                 >
                   {isEditing ? 'Update Product' : 'Create Product'}
                 </button>
                 
                 <button
                   type="button"
-                  style={{ ...shopStyles.secondaryBtn, width: '100%', justifyContent: 'center', marginTop: '12px' }}
+                  style={{ 
+                    ...shopStyles.secondaryBtn, 
+                    width: '100%', 
+                    justifyContent: 'center', 
+                    marginTop: '12px',
+                    padding: '14px'
+                  }}
                   onClick={() => navigate('/shop/products')}
                 >
                   Cancel

@@ -110,6 +110,7 @@ export const getCustomerProfile = async (req, res) => {
     const [customers] = await pool.query(`
       SELECT 
         a.*,
+        c.customer_code,
         c.address,
         c.add_phone,
         c.total_order,

@@ -3,9 +3,9 @@ import { authService } from "../../api/authService.js";
 
 export const loginUser = createAsyncThunk(
 	"auth/loginUser",
-	async ({ email, password }, { rejectWithValue }) => {
+	async ({ email, password, role }, { rejectWithValue }) => {
 		try {
-			const response = await authService.login(email, password);
+			const response = await authService.login(email, password, role);
 
 			if (response.data && response.data.data) {
 				const userData = response.data.data;

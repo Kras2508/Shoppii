@@ -146,12 +146,12 @@ VALUES
 -- ==========================
 -- 10. VOUCHER
 -- ==========================
-INSERT INTO Voucher (code, discount_type, discount_value, min_order_value, expired_date, usage_limit, status)
+INSERT INTO Voucher (code, discount_type, discount_value, min_order_value, start_date, expired_date, usage_limit, status)
 VALUES
- ('DISCOUNT10','Percentage',10,100000,'2025-12-31',10,'Active'),
- ('SAVE50','Amount',50000,200000,'2025-12-31',10,'Active'),
- ('NEWYEAR5','Percentage',5,50000,'2026-01-01',20,'Active'),
- ('EXPIRED100','Amount',100,300000,'2025-11-30',5,'Expired');
+ ('DISCOUNT10','Percentage',10,100000,'2025-01-01','2025-12-31',10,'Active'),
+ ('SAVE50','Amount',50000,200000,'2025-06-01','2025-12-31',10,'Active'),
+ ('NEWYEAR5','Percentage',5,50000,'2025-12-01','2026-01-01',20,'Active'),
+ ('EXPIRED100','Amount',100,300000,'2025-10-01','2025-11-30',5,'Expired');
 
 -- ==========================
 -- 11. ORDER

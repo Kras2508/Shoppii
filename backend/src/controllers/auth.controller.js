@@ -39,17 +39,14 @@ export const register = async (req, res) => {
       });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
     await connection.beginTransaction();
 
-    // Insert into Account table
+    // Insert into Account table (plain text password for development)
     // Trigger trg_account_after_insert will auto-create Customer/Shop/Admin record
     const [result] = await connection.query(
       `INSERT INTO Account (email, password, role, full_name, phone) 
        VALUES (?, ?, ?, ?, ?)`,
-      [email, hashedPassword, role, full_name, phone]
+      [email, password, role, full_name, phone]
     );
 
     const accountId = result.insertId;
@@ -99,12 +96,19 @@ export const register = async (req, res) => {
 // Login
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
         success: false,
         message: 'Email and password are required'
+      });
+    }
+
+    if (!role) {
+      return res.status(400).json({
+        success: false,
+        message: 'Role is required'
       });
     }
 
@@ -122,6 +126,14 @@ export const login = async (req, res) => {
     }
 
     const user = users[0];
+
+    // Check if role matches
+    if (user.role !== role) {
+      return res.status(403).json({
+        success: false,
+        message: `This account is registered as ${user.role}, not ${role}`
+      });
+    }
 
     // Check if account is banned
     if (user.status === 'Ban') {
@@ -155,7 +167,7 @@ export const login = async (req, res) => {
     if (user.role === 'Customer') {
       const [customerData] = await pool.query(
         `SELECT 
-          customer_id, address, add_phone, total_spent, total_order,
+          customer_id, customer_code, address, add_phone, total_spent, total_order,
           fn_get_customer_total_spent(customer_id) as calculated_total_spent
          FROM Customer WHERE customer_id = ?`,
         [user.account_id]
@@ -166,7 +178,7 @@ export const login = async (req, res) => {
     } else if (user.role === 'Shop') {
       const [shopData] = await pool.query(
         `SELECT 
-          shop_id, shop_name, shop_phone, address_shop, rating, shop_status,
+          shop_id, shop_code, shop_name, shop_phone, address_shop, rating, shop_status,
           fn_get_shop_revenue(shop_id) as total_revenue,
           fn_calculate_shop_rating(shop_id) as calculated_rating
          FROM Shop WHERE shop_id = ?`,
@@ -241,7 +253,7 @@ export const getProfile = async (req, res) => {
     if (user.role === 'Customer') {
       const [customerData] = await pool.query(
         `SELECT 
-          customer_id, address, add_phone, total_spent, total_order,
+          customer_id, customer_code, address, add_phone, total_spent, total_order,
           fn_get_customer_total_spent(customer_id) as calculated_total_spent
          FROM Customer WHERE customer_id = ?`,
         [accountId]
@@ -252,7 +264,7 @@ export const getProfile = async (req, res) => {
     } else if (user.role === 'Shop') {
       const [shopData] = await pool.query(
         `SELECT 
-          shop_id, shop_name, shop_phone, address_shop, rating, shop_status,
+          shop_id, shop_code, shop_name, shop_phone, address_shop, rating, shop_status,
           fn_get_shop_revenue(shop_id) as total_revenue,
           fn_calculate_shop_rating(shop_id) as calculated_rating
          FROM Shop WHERE shop_id = ?`,
@@ -407,8 +419,23 @@ export const changePassword = async (req, res) => {
       [accountId]
     );
 
-    // Verify current password
-    const isValidPassword = await bcrypt.compare(current_password, users[0].password);
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify current password (support both hashed and plain text)
+    let isValidPassword = false;
+    
+    if (users[0].password.startsWith('$2')) {
+      // Hashed password
+      isValidPassword = await bcrypt.compare(current_password, users[0].password);
+    } else {
+      // Plain text password (development seed data)
+      isValidPassword = current_password === users[0].password;
+    }
 
     if (!isValidPassword) {
       return res.status(400).json({
@@ -417,13 +444,10 @@ export const changePassword = async (req, res) => {
       });
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(new_password, 10);
-
-    // Update password
+    // Update password (plain text for development)
     await pool.query(
       'UPDATE Account SET password = ? WHERE account_id = ?',
-      [hashedPassword, accountId]
+      [new_password, accountId]
     );
 
     res.json({

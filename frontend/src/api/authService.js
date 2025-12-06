@@ -8,8 +8,8 @@ export const authService = {
   },
 
   // Login
-  login: (email, password) => {
-    return publicClient.post('/auth/login', { email, password })
+  login: (email, password, role) => {
+    return publicClient.post('/auth/login', { email, password, role })
   },
 
   // Get Profile

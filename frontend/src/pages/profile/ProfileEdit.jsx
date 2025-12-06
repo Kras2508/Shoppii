@@ -8,6 +8,8 @@ const ProfileEdit = ({ user, styles, onSave, onCancel }) => {
     phone: user.phone || '',
     add_phone: user.add_phone || '',
     address: user.address || '',
+    current_password: '',
+    new_password: '',
   });
 
   const handleChange = (e) => {
@@ -102,6 +104,9 @@ const ProfileEdit = ({ user, styles, onSave, onCancel }) => {
             <label style={styles.formLabel}>Current password</label>
             <input
               type="password"
+              name="current_password"
+              value={formData.current_password}
+              onChange={handleChange}
               style={styles.formInput}
               placeholder="Enter to change password"
             />
@@ -110,6 +115,9 @@ const ProfileEdit = ({ user, styles, onSave, onCancel }) => {
             <label style={styles.formLabel}>New password</label>
             <input
               type="password"
+              name="new_password"
+              value={formData.new_password}
+              onChange={handleChange}
               style={styles.formInput}
               placeholder="New password"
             />

@@ -46,7 +46,7 @@ export const getProducts = async (req, res) => {
         p.product_id,
         p.product_name,
         p.description,
-        MAX(CASE WHEN pi.image_url IS NOT NULL THEN pi.image_url END) as image,
+        p.image,
         p.status,
         p.created_at,
         p.shop_id,
@@ -58,18 +58,25 @@ export const getProducts = async (req, res) => {
         MAX(pi.price) as max_price,
         SUM(pi.stock) as total_stock,
         COUNT(DISTINCT pi.item_id) as variant_count,
-        COALESCE(AVG(r.rating), 0) as avg_rating,
-        COUNT(DISTINCT r.review_id) as review_count
+        COALESCE((
+          SELECT AVG(r.rating)
+          FROM Review r
+          WHERE r.target_id = p.product_id AND r.target_type = 'Product'
+        ), 0) as avg_rating,
+        COALESCE((
+          SELECT COUNT(*)
+          FROM Review r
+          WHERE r.target_id = p.product_id AND r.target_type = 'Product'
+        ), 0) as review_count
       FROM Product p
       INNER JOIN Shop s ON p.shop_id = s.shop_id
       INNER JOIN Category c ON p.category_id = c.category_id
       LEFT JOIN ProductItem pi ON p.product_id = pi.product_id
-      LEFT JOIN Review r ON p.product_id = r.target_id AND r.target_type = 'Product'
       ${whereClause}
-      ${min_price ? 'HAVING min_price >= ?' : ''}
-      ${max_price ? (min_price ? ' AND max_price <= ?' : 'HAVING max_price <= ?') : ''}
       GROUP BY p.product_id, p.product_name, p.description, p.image, p.status, 
                p.created_at, p.shop_id, s.shop_name, s.rating, c.category_id, c.category_name
+      ${min_price ? 'HAVING min_price >= ?' : ''}
+      ${max_price ? (min_price ? ' AND max_price <= ?' : 'HAVING max_price <= ?') : ''}
       ORDER BY ${sort_by === 'price' ? 'min_price' : sort_by === 'rating' ? 'avg_rating' : 'p.created_at'} ${sort_order}
       LIMIT ? OFFSET ?
     `;
@@ -605,19 +612,52 @@ export const getShopProducts = async (req, res) => {
         MAX(pi.price) as max_price,
         SUM(pi.stock) as total_stock,
         COUNT(DISTINCT pi.item_id) as variant_count,
-        COALESCE(SUM(oi.quantity), 0) as total_sold,
-        COALESCE(AVG(r.rating), 0) as avg_rating,
+        COALESCE((
+          SELECT SUM(oi.quantity)
+          FROM OrderItem oi
+          INNER JOIN ProductItem pi2 ON oi.item_id = pi2.item_id
+          INNER JOIN \`Order\` o ON oi.order_id = o.order_id
+          WHERE pi2.product_id = p.product_id AND o.status != 'Cancelled'
+        ), 0) as total_sold,
+        COALESCE((
+          SELECT AVG(r.rating)
+          FROM Review r
+          WHERE r.target_id = p.product_id AND r.target_type = 'Product'
+        ), 0) as avg_rating,
         MAX(CASE WHEN pi.image_url IS NOT NULL THEN pi.image_url END) as image
       FROM Product p
       INNER JOIN Category c ON p.category_id = c.category_id
       LEFT JOIN ProductItem pi ON p.product_id = pi.product_id
-      LEFT JOIN OrderItem oi ON pi.item_id = oi.item_id
-      LEFT JOIN Review r ON p.product_id = r.target_id AND r.target_type = 'Product'
       ${whereClause}
       GROUP BY p.product_id
       ORDER BY p.created_at DESC
       LIMIT ? OFFSET ?
     `, [...params, parseInt(limit), parseInt(offset)]);
+
+    // Fetch items for each product with sold quantity
+    for (let product of products) {
+      const [items] = await pool.query(`
+        SELECT 
+          pi.item_id,
+          pi.color,
+          pi.type,
+          pi.price,
+          pi.stock,
+          pi.image_url,
+          COALESCE((
+            SELECT SUM(oi.quantity)
+            FROM OrderItem oi
+            INNER JOIN \`Order\` o ON oi.order_id = o.order_id
+            WHERE oi.item_id = pi.item_id AND o.status != 'Cancelled'
+          ), 0) as sold
+        FROM ProductItem pi
+        WHERE pi.product_id = ?
+        ORDER BY pi.item_id
+      `, [product.product_id]);
+      
+      product.items = items;
+      product.item_count = items.length;
+    }
 
     // Get total count
     const [countResult] = await pool.query(`

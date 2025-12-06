@@ -2,7 +2,7 @@ import React from 'react';
 
 const ProfileHeader = ({ user, styles, onEditProfile }) => {
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('vi-VN', {
+    return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -33,7 +33,7 @@ const ProfileHeader = ({ user, styles, onEditProfile }) => {
             📱 {user.phone}
           </span>
           <span style={styles.metaItem}>
-            📍 {user.address || 'Chưa cập nhật địa chỉ'}
+            📍 {user.address || 'Address not updated'}
           </span>
         </div>
 
@@ -43,7 +43,7 @@ const ProfileHeader = ({ user, styles, onEditProfile }) => {
 
         <div style={{ marginTop: '16px' }}>
           <button style={styles.editProfileBtn} onClick={onEditProfile}>
-            ✏️ Edit Profile
+            Edit Profile
           </button>
         </div>
       </div>

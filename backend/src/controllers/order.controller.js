@@ -417,11 +417,18 @@ export const updateOrderStatus = async (req, res) => {
       }
     }
 
-    // Update order status
-    const [result] = await pool.query(
-      'UPDATE `Order` SET status = ? WHERE order_id = ?',
-      [status, id]
-    );
+    // Update order status and delivered_date if status is 'Delivered'
+    let updateQuery = 'UPDATE `Order` SET status = ?';
+    const updateParams = [status];
+    
+    if (status === 'Delivered') {
+      updateQuery += ', delivered_date = NOW()';
+    }
+    
+    updateQuery += ' WHERE order_id = ?';
+    updateParams.push(id);
+    
+    const [result] = await pool.query(updateQuery, updateParams);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({

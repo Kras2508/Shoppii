@@ -19,7 +19,7 @@ CREATE TABLE Account (
     password VARCHAR(255) NOT NULL,
     role ENUM('Customer','Shop','Admin') NOT NULL,
     full_name VARCHAR(255) NOT NULL,
-    phone VARCHAR(20) NOT NULL,
+    phone VARCHAR(20) NOT NULL CHECK (LENGTH(phone) = 10 AND phone REGEXP '^[0-9]{10}$'),
     status ENUM('Active','Ban') DEFAULT 'Active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT CK_AccountRole CHECK (role IN ('Customer','Shop','Admin'))
@@ -32,7 +32,7 @@ CREATE TABLE Customer (
     customer_id INT PRIMARY KEY,
     customer_code VARCHAR(20) UNIQUE,
     address VARCHAR(255),
-    add_phone VARCHAR(20),
+    add_phone VARCHAR(20) CHECK (LENGTH(add_phone) = 10 AND add_phone REGEXP '^[0-9]{10}$'),
     total_spent DECIMAL(15,2) DEFAULT 0,
     total_order INT DEFAULT 0,
     FOREIGN KEY (customer_id) REFERENCES Account(account_id) ON DELETE CASCADE
@@ -45,7 +45,7 @@ CREATE TABLE Shop (
     shop_id INT PRIMARY KEY,
     shop_code VARCHAR(20) UNIQUE,
     shop_name VARCHAR(255) NOT NULL,
-    shop_phone VARCHAR(20),
+    shop_phone VARCHAR(20) CHECK (LENGTH(shop_phone) = 10 AND shop_phone REGEXP '^[0-9]{10}$'),
     address_shop VARCHAR(255),
     rating DECIMAL(3,2) DEFAULT 0 CHECK (rating BETWEEN 0 AND 5),
     shop_status ENUM('Open','Temporarily Close','Closed') DEFAULT 'Open',
@@ -137,11 +137,13 @@ CREATE TABLE Voucher (
     discount_type ENUM('Percentage','Amount') NOT NULL,
     discount_value DECIMAL(10,2) NOT NULL CHECK(discount_value >= 0),
     min_order_value DECIMAL(15,2) DEFAULT 0 CHECK(min_order_value >= 0),
+    start_date DATE NOT NULL,
     expired_date DATE NOT NULL,
     usage_limit INT DEFAULT 1 CHECK(usage_limit >= 1),
     used_count INT DEFAULT 0,
     status ENUM('Active','Expired') DEFAULT 'Active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CK_VoucherDateRange CHECK (expired_date >= start_date)
 );
 
 -- ORDER (Customer 1-N Order)

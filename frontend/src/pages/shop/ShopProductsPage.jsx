@@ -20,6 +20,7 @@ const ShopProductsPage = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expandedProducts, setExpandedProducts] = useState({});
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -41,9 +42,12 @@ const ShopProductsPage = () => {
             product_name: p.product_name,
             image: p.image,
             category: p.category_name,
-            price: p.min_price || 0,
-            stock: p.total_stock || 0,
-            sold: p.total_sold || 0,
+            items: p.items || [], // Array of ProductItems
+            item_count: p.item_count || 0,
+            total_stock: p.total_stock || 0,
+            total_sold: p.total_sold || 0,
+            min_price: p.min_price || 0,
+            max_price: p.max_price || 0,
             status: p.status,
             rating: p.avg_rating || 0
           })));
@@ -61,7 +65,7 @@ const ShopProductsPage = () => {
       }
     };
     fetchData();
-  }, [isAuthenticated, navigate, token]);
+  }, [isAuthenticated, navigate]);
 
   const formatPrice = (price) => price.toLocaleString('vi-VN') + 'đ';
 
@@ -113,6 +117,13 @@ const ShopProductsPage = () => {
     }
   };
 
+  const toggleExpand = (productId) => {
+    setExpandedProducts(prev => ({
+      ...prev,
+      [productId]: !prev[productId]
+    }));
+  };
+
   if (loading) {
     return (
       <div style={shopStyles.page}>
@@ -136,7 +147,6 @@ const ShopProductsPage = () => {
   }
 
   if (!isAuthenticated) {
-    navigate('/signin');
     return null;
   }
 
@@ -207,7 +217,8 @@ const ShopProductsPage = () => {
             <table style={shopStyles.table}>
               <thead style={shopStyles.tableHeader}>
                 <tr>
-                  <th style={shopStyles.th}>Product</th>
+                  <th style={shopStyles.th}>Product / Item</th>
+                  <th style={shopStyles.th}>Color / Type</th>
                   <th style={shopStyles.th}>Price</th>
                   <th style={shopStyles.th}>Stock</th>
                   <th style={shopStyles.th}>Sold</th>
@@ -216,76 +227,157 @@ const ShopProductsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.map(product => (
-                  <tr key={product.product_id}>
-                    <td style={shopStyles.td}>
-                      <div style={shopStyles.productRow}>
-                        <img
-                          src={product.image}
-                          alt={product.product_name}
-                          style={shopStyles.productImage}
-                        />
-                        <div style={shopStyles.productInfo}>
-                          <div style={shopStyles.productName}>{product.product_name}</div>
-                          <div style={shopStyles.productCategory}>{product.category}</div>
-                          <div style={{ fontSize: '12px', color: '#FFB800' }}>
-                            ⭐ {product.rating}
+                {filteredProducts.map(product => {
+                  const isExpanded = expandedProducts[product.product_id];
+                  const hasItems = product.items && product.items.length > 0;
+                  
+                  return (
+                    <React.Fragment key={product.product_id}>
+                      {/* Main Product Row */}
+                      <tr style={{ backgroundColor: '#f8f9fa', fontWeight: 'bold' }}>
+                        <td style={shopStyles.td}>
+                          <div style={shopStyles.productRow}>
+                            {hasItems && (
+                              <button
+                                onClick={() => toggleExpand(product.product_id)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '16px',
+                                  marginRight: '8px',
+                                  padding: '0',
+                                  transition: 'transform 0.2s'
+                                }}
+                                title={isExpanded ? 'Collapse items' : 'Expand items'}
+                              >
+                                {isExpanded ? '▼' : '▶'}
+                              </button>
+                            )}
+                            <img
+                              src={product.image}
+                              alt={product.product_name}
+                              style={shopStyles.productImage}
+                            />
+                            <div style={shopStyles.productInfo}>
+                              <div style={shopStyles.productName}>{product.product_name}</div>
+                              <div style={shopStyles.productCategory}>{product.category}</div>
+                              <div style={{ fontSize: '12px', color: '#FFB800' }}>
+                                ⭐ {product.rating}
+                              </div>
+                              {hasItems && (
+                                <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                                  {product.item_count} item{product.item_count > 1 ? 's' : ''}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={shopStyles.td}>
-                      <strong style={{ color: '#647A67' }}>{formatPrice(product.price)}</strong>
-                    </td>
-                    <td style={shopStyles.td}>
-                      <span style={{ color: product.stock === 0 ? '#dc3545' : '#333' }}>
-                        {product.stock}
-                      </span>
-                    </td>
-                    <td style={shopStyles.td}>{product.sold}</td>
-                    <td style={shopStyles.td}>
-                      <span style={getStatusStyle(product.status)}>
-                        {getStatusText(product.status)}
-                      </span>
-                    </td>
-                    <td style={shopStyles.td}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            backgroundColor: '#f39c12',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                          onClick={() => navigate(`/shop/products/${product.product_id}/edit`)}
-                          title="Edit product"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            backgroundColor: '#dc3545',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                          onClick={() => handleDeleteClick(product)}
-                          title="Delete product"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        </td>
+                        <td style={shopStyles.td}>
+                          <span style={{ color: '#999', fontSize: '12px' }}>—</span>
+                        </td>
+                        <td style={shopStyles.td}>
+                          <strong style={{ color: '#647A67' }}>
+                            {product.min_price === product.max_price 
+                              ? formatPrice(product.min_price)
+                              : `${formatPrice(product.min_price)} - ${formatPrice(product.max_price)}`
+                            }
+                          </strong>
+                        </td>
+                        <td style={shopStyles.td}>
+                          <strong>{product.total_stock}</strong>
+                        </td>
+                        <td style={shopStyles.td}>
+                          <strong>{product.total_sold}</strong>
+                        </td>
+                        <td style={shopStyles.td}>
+                          <span style={getStatusStyle(product.status)}>
+                            {getStatusText(product.status)}
+                          </span>
+                        </td>
+                        <td style={shopStyles.td}>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                backgroundColor: '#f39c12',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onClick={() => navigate(`/shop/products/${product.product_id}/edit`)}
+                              title="Edit product"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                backgroundColor: '#dc3545',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onClick={() => handleDeleteClick(product)}
+                              title="Delete product"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* ProductItem Rows (Expandable) */}
+                      {isExpanded && hasItems && product.items.map((item, idx) => (
+                        <tr key={`${product.product_id}-item-${idx}`} style={{ backgroundColor: '#fff' }}>
+                          <td style={{ ...shopStyles.td, paddingLeft: '60px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              {item.image_url && (
+                                <img
+                                  src={item.image_url}
+                                  alt={`${item.color} ${item.type}`}
+                                  style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }}
+                                />
+                              )}
+                              <span style={{ fontSize: '13px', color: '#666' }}>
+                                Item #{idx + 1}
+                              </span>
+                            </div>
+                          </td>
+                          <td style={shopStyles.td}>
+                            <div style={{ fontSize: '13px' }}>
+                              <div><strong>Color:</strong> {item.color}</div>
+                              <div><strong>Type:</strong> {item.type}</div>
+                            </div>
+                          </td>
+                          <td style={shopStyles.td}>
+                            <span style={{ color: '#647A67' }}>{formatPrice(item.price)}</span>
+                          </td>
+                          <td style={shopStyles.td}>
+                            <span style={{ color: item.stock === 0 ? '#dc3545' : '#333' }}>
+                              {item.stock}
+                            </span>
+                          </td>
+                          <td style={shopStyles.td}>
+                            <span style={{ color: '#28a745' }}>{item.sold || 0}</span>
+                          </td>
+                          <td style={shopStyles.td}>
+                            <span style={{ fontSize: '12px', color: '#666' }}>—</span>
+                          </td>
+                          <td style={shopStyles.td}>
+                            <span style={{ fontSize: '12px', color: '#999' }}>—</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           )}

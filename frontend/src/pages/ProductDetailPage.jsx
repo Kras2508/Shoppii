@@ -826,7 +826,7 @@ const ProductDetailPage = () => {
             {/* Variant Selection */}
             {product.variants && product.variants.length > 0 && (
               <div style={styles.variantSection}>
-                <div style={styles.variantLabel}>Variant</div>
+                <div style={styles.variantLabel}>Item</div>
                 <div style={styles.variantOptions}>
                   {product.variants.map((variant, idx) => (
                     <button

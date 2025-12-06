@@ -149,7 +149,11 @@ const SignInPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const result = await dispatch(loginUser({ email: formData.email, password: formData.password }));
+      const result = await dispatch(loginUser({ 
+        email: formData.email, 
+        password: formData.password,
+        role: formData.role 
+      }));
       
       if (result.payload && result.payload.user) {
         // Login successful - redirect based on role

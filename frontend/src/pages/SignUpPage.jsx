@@ -168,8 +168,9 @@ const SignUpPage = () => {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự');
+
+    if (!formData.phone || formData.phone.length !== 10 || !/^\d{10}$/.test(formData.phone)) {
+      setError('Số điện thoại phải là 10 chữ số');
       return;
     }
 
@@ -185,9 +186,13 @@ const SignUpPage = () => {
 
       if (response.data?.success) {
         // Auto login
-        const loginRes = await authService.login(formData.email, formData.password);
+        const loginRes = await authService.login(formData.email, formData.password, formData.role);
         if (loginRes.data?.data) {
-          await dispatch(loginUser(loginRes.data.data));
+          await dispatch(loginUser({ 
+            email: formData.email, 
+            password: formData.password,
+            role: formData.role 
+          }));
           navigate(formData.role === 'Shop' ? '/shop' : '/');
         }
       }
@@ -316,7 +321,7 @@ const SignUpPage = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  🛍️ Người mua
+                  🛍️ Customer
                 </button>
                 <button
                   type="button"
@@ -333,7 +338,7 @@ const SignUpPage = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  🏪 Người bán
+                  🏪 Shop
                 </button>
               </div>
             </div>
@@ -366,7 +371,7 @@ const SignUpPage = () => {
                 if (agreeTerms && !loading) e.target.style.backgroundColor = '#647A67';
               }}
             >
-              {loading ? 'Đang đăng ký...' : 'Signup'}
+              {loading ? 'Signing up...' : 'Signup'}
             </button>
           </form>
 

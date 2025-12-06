@@ -24,6 +24,7 @@ export const getVouchers = async (req, res) => {
         discount_type,
         discount_value,
         min_order_value,
+        start_date,
         expired_date,
         usage_limit,
         used_count,
@@ -151,15 +152,16 @@ export const createVoucher = async (req, res) => {
       code,
       discount_type, 
       discount_value, 
-      min_order_value = 0, 
+      min_order_value = 0,
+      start_date,
       expired_date, 
       usage_limit = 1 
     } = req.body;
 
-    if (!code || !discount_type || !discount_value || !expired_date) {
+    if (!code || !discount_type || !discount_value || !start_date || !expired_date) {
       return res.status(400).json({
         success: false,
-        message: 'Code, discount type, value and expiry date are required'
+        message: 'Code, discount type, value, start date and expiry date are required'
       });
     }
 
@@ -170,10 +172,18 @@ export const createVoucher = async (req, res) => {
       });
     }
 
+    // Validate date range
+    if (new Date(expired_date) < new Date(start_date)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Expired date must be greater than or equal to start date'
+      });
+    }
+
     const [result] = await pool.query(`
-      INSERT INTO Voucher (code, discount_type, discount_value, min_order_value, expired_date, usage_limit)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [code, discount_type, discount_value, min_order_value, expired_date, usage_limit]);
+      INSERT INTO Voucher (code, discount_type, discount_value, min_order_value, start_date, expired_date, usage_limit)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [code, discount_type, discount_value, min_order_value, start_date, expired_date, usage_limit]);
 
     res.status(201).json({
       success: true,
@@ -195,7 +205,7 @@ export const createVoucher = async (req, res) => {
 export const updateVoucher = async (req, res) => {
   try {
     const { id } = req.params;
-    const { code, discount_type, discount_value, min_order_value, expired_date, usage_limit, status } = req.body;
+    const { code, discount_type, discount_value, min_order_value, start_date, expired_date, usage_limit, status } = req.body;
 
     const updateFields = [];
     const updateValues = [];
@@ -221,6 +231,10 @@ export const updateVoucher = async (req, res) => {
     if (min_order_value !== undefined) {
       updateFields.push('min_order_value = ?');
       updateValues.push(min_order_value);
+    }
+    if (start_date) {
+      updateFields.push('start_date = ?');
+      updateValues.push(start_date);
     }
     if (expired_date) {
       updateFields.push('expired_date = ?');

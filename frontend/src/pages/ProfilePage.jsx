@@ -106,15 +106,34 @@ const ProfilePage = () => {
 
   const handleSaveProfile = async (formData) => {
     try {
-      await authService.updateProfile(formData, privateClient);
-      alert('Profile updated successfully!');
+      // Update basic profile info
+      const profileUpdateData = {
+        full_name: formData.full_name,
+        phone: formData.phone,
+        add_phone: formData.add_phone,
+        address: formData.address,
+      };
+      
+      await authService.updateProfile(profileUpdateData, privateClient);
+      
+      // Change password if provided
+      if (formData.current_password && formData.new_password) {
+        await authService.changePassword({
+          current_password: formData.current_password,
+          new_password: formData.new_password
+        }, privateClient);
+        alert('Profile and password updated successfully!');
+      } else {
+        alert('Profile updated successfully!');
+      }
+      
       setIsEditing(false);
       // Refresh profile data
       const profileRes = await authService.getProfile(privateClient);
       setProfileData(profileRes.data?.data);
     } catch (err) {
       console.error('Error updating profile:', err);
-      alert('Error updating profile information');
+      alert(err.response?.data?.message || 'Error updating profile information');
     }
   };
 

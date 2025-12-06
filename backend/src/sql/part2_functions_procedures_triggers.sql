@@ -703,6 +703,7 @@ DROP TRIGGER IF EXISTS trg_product_item_before_update;
 DROP TRIGGER IF EXISTS trg_account_after_insert;
 DROP TRIGGER IF EXISTS trg_customer_before_insert;
 DROP TRIGGER IF EXISTS trg_shop_before_insert;
+DROP TRIGGER IF EXISTS trg_order_after_update;
 
 DELIMITER $$
 
@@ -935,6 +936,69 @@ FOR EACH ROW
 BEGIN
     -- Generate shop_code from shop_id
     SET NEW.shop_code = CONCAT('SHOP', LPAD(NEW.shop_id, 5, '0'));
+END$$
+
+-- ---------------------------------------------
+-- TRIGGER 9: Order After Update
+-- Restore stock when order is cancelled
+-- Update product status back to Active if stock available
+-- ---------------------------------------------
+CREATE TRIGGER trg_order_after_update
+AFTER UPDATE ON `Order`
+FOR EACH ROW
+BEGIN
+    DECLARE v_product_id INT;
+    DECLARE v_total_stock INT;
+    
+    -- If order status changed from non-Cancelled to Cancelled, restore stock
+    IF OLD.status != 'Cancelled' AND NEW.status = 'Cancelled' THEN
+        -- Create a cursor to iterate through order items
+        BEGIN
+            DECLARE done INT DEFAULT FALSE;
+            DECLARE v_item_id INT;
+            DECLARE v_quantity INT;
+            
+            DECLARE item_cursor CURSOR FOR
+                SELECT item_id, quantity
+                FROM OrderItem
+                WHERE order_id = NEW.order_id;
+            
+            DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+            
+            OPEN item_cursor;
+            
+            restore_loop: LOOP
+                FETCH item_cursor INTO v_item_id, v_quantity;
+                IF done THEN
+                    LEAVE restore_loop;
+                END IF;
+                
+                -- Restore stock for this item
+                UPDATE ProductItem
+                SET stock = stock + v_quantity
+                WHERE item_id = v_item_id;
+                
+                -- Get product_id
+                SELECT product_id INTO v_product_id
+                FROM ProductItem
+                WHERE item_id = v_item_id;
+                
+                -- Check total stock for this product
+                SELECT SUM(stock) INTO v_total_stock
+                FROM ProductItem
+                WHERE product_id = v_product_id;
+                
+                -- Update product status back to Active if stock is available
+                IF v_total_stock > 0 THEN
+                    UPDATE Product
+                    SET status = 'Active'
+                    WHERE product_id = v_product_id AND status = 'Out of stock';
+                END IF;
+            END LOOP;
+            
+            CLOSE item_cursor;
+        END;
+    END IF;
 END$$
 
 -- =============================================
