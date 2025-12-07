@@ -1,0 +1,71 @@
+\section{Relational Database Schema}
+\subsection{Mapping Diagram}
+This is the Relational Database Schema Diagram: \href{https://drive.google.com/drive/folders/1dsh1EjIU-XkZMCSz5eh7EoLQTt36-k-j?usp=drive_link}{HERE}
+\begin{figure}[H]
+    \includegraphics[width=1.1\textwidth]{img/Mapping.png}
+    \caption{Relational Schema Diagram}
+\end{figure}
+
+\subsection{Relational Database Schema Description}
+\definecolor{headerblue}{RGB}{41, 128, 185}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+
+\begin{longtable}{p{3cm}p{3cm}p{9cm}}
+\caption{Mapping to Database Schema} \label{tab:database-schema} \\
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Name}} & \textcolor{white}{\textbf{Primary Key}} & \textcolor{white}{\textbf{Foreign Key}} \\
+\midrule
+\endfirsthead
+
+\multicolumn{3}{c}%
+{\small \tablename\ \thetable\ -- \textit{Continued from previous page}} \\
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Name}} & \textcolor{white}{\textbf{Primary Key}} & \textcolor{white}{\textbf{Foreign Key}} \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{3}{r}{\small\textit{Continued on next page}} \\
+\endfoot
+
+\bottomrule
+\endlastfoot
+
+\rowcolor{lightgray}
+ACCOUNT & account\_id & -- \\[3pt]
+CUSTOMER & customer\_id & customer\_id $\rightarrow$ ACCOUNT.account\_id \\[3pt]
+\rowcolor{lightgray}
+SHOP & shop\_id & shop\_id $\rightarrow$ ACCOUNT.account\_id \\[3pt]
+ADMIN & admin\_id & admin\_id $\rightarrow$ ACCOUNT.account\_id \\[3pt]
+\rowcolor{lightgray}
+CATEGORY & category\_id & parent\_category\_id $\rightarrow$ CATEGORY.category\_id \\[3pt]
+PRODUCT & product\_id & shop\_id $\rightarrow$ SHOP.shop\_id; 
+
+category\_id $\rightarrow$ CATEGORY.category\_id \\[3pt]
+\rowcolor{lightgray}
+PRODUCT\-ITEM & item\_id & product\_id $\rightarrow$ PRODUCT.product\_id; 
+
+shop\_id $\rightarrow$ SHOP.shop\_id \\[3pt]
+CART & cart\_id & customer\_id $\rightarrow$ CUSTOMER.customer\_id \\[3pt]
+\rowcolor{lightgray}
+CART\-ITEM & cart\_item\_id & cart\_id $\rightarrow$ CART.cart\_id; 
+
+item\_id $\rightarrow$ PRODUCTITEM.item\_id \\[3pt]
+SHIPPING & shipping\_id & -- \\[3pt]
+\rowcolor{lightgray}
+VOUCHER & voucher\_id & -- \\[3pt]
+ORDER & order\_id & customer\_id $\rightarrow$ CUSTOMER.customer\_id; 
+
+shipping\_id $\rightarrow$ SHIPPING.shipping\_id; 
+
+voucher\_id $\rightarrow$ VOUCHER.voucher\_id \\[3pt]
+\rowcolor{lightgray}
+ORDER\-ITEM & order\_item\_id & order\_id $\rightarrow$ ORDER.order\_id; 
+
+item\_id $\rightarrow$ PRODUCTITEM.item\_id; 
+
+shop\_id $\rightarrow$ SHOP.shop\_id \\[3pt]
+REVIEW & review\_id & customer\_id $\rightarrow$ CUSTOMER.customer\_id \\[3pt]
+\end{longtable}

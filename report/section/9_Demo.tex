@@ -1,0 +1,200 @@
+\section{Application Demo and System Workflow}
+
+This section demonstrates the complete e-commerce system architecture and how the application works from database to user interface.
+
+\subsection{System Architecture Overview}
+
+\subsubsection{Three-Tier Architecture Design}
+
+\paragraph{1. Data Layer (MySQL Database):}
+
+The database layer handles all data storage and business logic execution:
+
+\begin{itemize}
+    \item \textbf{14 Tables}: Account (superclass), Customer, Shop, Admin (inheritance), Product, ProductItem, Category (recursive hierarchy), Order, OrderItem, Cart, CartItem, Voucher, Shipping, Review
+    \item \textbf{6 Functions}: Calculate totals (order total, customer spent, shop revenue), Calculate ratings (product rating, shop rating), Cursor demonstration (order total items)
+    \item \textbf{13 Procedures}: 
+    \begin{itemize}
+        \item Category hierarchy navigation (get hierarchy, get all children, get all parents) - using Recursive CTE
+        \item Order management (create order from cart, apply voucher) - complex transactions
+        \item Shop analytics (revenue report with top products) - aggregations and reporting
+        \item Product CRUD (add, update, delete product and product items) - data manipulation
+        \item Product search (dynamic filtering, sorting, pagination) - advanced queries
+    \end{itemize}
+    \item \textbf{9 Triggers}: Auto-generate customer/shop codes, manage inventory stock, update rating statistics, create cart automatically, enforce business rules
+\end{itemize}
+
+\paragraph{2. Application Layer (Node.js + Express):}
+
+The backend provides RESTful API endpoints organized by business modules:
+
+\begin{itemize}
+    \item \textbf{MVC Architecture}: Controllers handle requests, call database procedures/functions, return JSON responses
+    \item \textbf{11 Controller Modules}:
+    \begin{itemize}
+        \item \texttt{auth.controller.js}: User registration, login, JWT token management
+        \item \texttt{product.controller.js}: Product search, CRUD operations, variant management
+        \item \texttt{cart.controller.js}: Add/remove items, update quantities, view cart
+        \item \texttt{order.controller.js}: Create orders, view history, update status, cancellation
+        \item \texttt{customer.controller.js}: Profile management, order history, statistics
+        \item \texttt{shop.controller.js}: Shop information, revenue reports, analytics
+        \item \texttt{review.controller.js}: Submit reviews, view ratings, calculate averages
+        \item \texttt{category.controller.js}: Category tree, parent-child relationships
+        \item \texttt{voucher.controller.js}: Validate codes, apply discounts
+        \item \texttt{shipping.controller.js}: Shipping methods, fee calculation
+        \item \texttt{admin.controller.js}: System management, user administration
+    \end{itemize}
+    \item \textbf{Middleware}: JWT authentication, role-based authorization, error handling, request validation
+    \item \textbf{Routes}: RESTful endpoints following naming conventions (GET /api/products, POST /api/orders, etc.)
+\end{itemize}
+
+\paragraph{3. Presentation Layer (React + Redux):}
+
+The frontend provides interactive user interfaces for different user roles:
+
+\begin{itemize}
+    \item \textbf{Page Structure}:
+    \begin{itemize}
+        \item \textbf{Public Pages} (5): HomePage, SignInPage, SignUpPage, ProductListPage, ProductDetailPage
+        \item \textbf{Customer Pages} (6): CartPage, CheckoutPage, OrderConfirmationPage, OrderDetailPage, ProfilePage, ReviewPage
+        \item \textbf{Shop Owner Pages} (4): ShopDashboard, ShopProducts, ShopOrders, ShopAnalytics
+        \item \textbf{Admin Pages} (3): AdminDashboard, UserManagement, SystemReports
+    \end{itemize}
+    \item \textbf{Components}: Reusable UI components (Button, Modal, Card, Input, Dropdown, Spinner, Toast notifications)
+    \item \textbf{State Management}: Redux stores for auth, cart, products, orders - synchronized across all pages
+    \item \textbf{Routing}: React Router with protected routes based on user roles
+\end{itemize}
+
+\subsection{Main Features Demonstration}
+
+\subsubsection{Feature 1: Product Search and Discovery}
+
+\textbf{User Experience:}
+\begin{itemize}
+    \item Customer visits homepage, browses category menu (Electronics $>$ Phones)
+    \item Enters search term "iPhone" in search bar
+    \item Applies filters: Price range (0-2,000,000 VND), Rating (4+ stars)
+    \item Sorts results by rating (descending)
+    \item Views paginated results showing 20 products per page
+\end{itemize}
+
+\textbf{Behind the Scenes:}
+\begin{itemize}
+    \item Frontend sends GET request: \texttt{/api/products?search=iPhone\&category=3\&minPrice=0\&maxPrice=2000000\&sort=rating}
+    \item Backend calls: \texttt{CALL sp\_get\_product\_list(...)}
+    \item Database executes dynamic SQL with JOINs (Product, ProductItem, Shop, Review)
+    \item Calculates: MIN/MAX price, total stock, variant count, average rating
+    \item Returns JSON with products array and pagination metadata
+    \item Frontend renders product grid with images, prices, ratings, stock status
+\end{itemize}
+
+\subsubsection{Feature 2: Shopping Cart Management}
+
+\textbf{User Experience:}
+\begin{itemize}
+    \item Customer selects product variant (iPhone 15, Red, 128GB)
+    \item Clicks "Add to Cart" button
+    \item Toast notification confirms: "Product added to cart!"
+    \item Cart icon updates showing item count
+    \item Navigates to CartPage to review items
+    \item Adjusts quantities using +/- buttons
+    \item Removes unwanted items
+    \item Sees real-time subtotal calculation
+\end{itemize}
+
+\textbf{Behind the Scenes:}
+\begin{itemize}
+    \item Frontend: POST \texttt{/api/cart/add} with \texttt{\{item\_id, quantity\}}
+    \item Backend: INSERT into CartItem or UPDATE quantity if exists
+    \item Database: Retrieves cart\_id from Cart table (one cart per customer)
+    \item Redux store updates cart state globally
+    \item All components showing cart info re-render automatically
+\end{itemize}
+
+\subsubsection{Feature 3: Order Creation with Voucher}
+
+\textbf{User Experience:}
+\begin{itemize}
+    \item Customer proceeds to checkout
+    \item Selects shipping method (Standard Shipping - 5,000 VND)
+    \item Enters voucher code "DISCOUNT10" and clicks "Apply"
+    \item System validates voucher: "10\% discount applied! Save 220,000 VND"
+    \item Confirms shipping address and payment method (Banking)
+    \item Reviews final total: Subtotal (2,200,000) + Shipping (5,000) - Discount (220,000) = 1,985,000 VND
+    \item Clicks "Place Order"
+    \item Redirected to order confirmation page with order ID
+\end{itemize}
+
+\textbf{Behind the Scenes:}
+\begin{itemize}
+    \item Voucher validation: \texttt{CALL sp\_apply\_voucher(code, amount, @discount, @valid, @message)}
+    \item Checks: voucher exists, is active, not expired, usage limit not reached, order meets minimum value
+    \item Order creation: \texttt{CALL sp\_create\_order\_from\_cart(...)}
+    \item Database transaction executes:
+    \begin{enumerate}
+        \item Validates customer, shipping method, cart has items
+        \item Calculates subtotal from CartItems
+        \item Applies voucher discount, adds shipping fee
+        \item Inserts Order with status 'Processing'
+        \item Moves CartItems to OrderItems
+        \item Reduces ProductItem stock (inventory management)
+        \item Clears cart
+        \item Updates Customer statistics (total\_order++, total\_spent+=amount)
+    \end{enumerate}
+    \item Frontend receives order\_id, updates Redux, shows confirmation
+\end{itemize}
+
+\subsubsection{Feature 4: Product Review and Rating}
+
+\textbf{User Experience:}
+\begin{itemize}
+    \item Customer receives order with status "Delivered"
+    \item Navigates to OrderDetailPage, sees "Leave Review" button
+    \item Opens ReviewPage for Product 1 (iPhone 15)
+    \item Selects 5-star rating
+    \item Writes comment: "Excellent product! Fast delivery, highly recommend!"
+    \item Clicks "Submit Review"
+    \item Success message: "Review submitted! Product rating updated to 4.67 stars"
+\end{itemize}
+
+\textbf{Behind the Scenes:}
+\begin{itemize}
+    \item Frontend: POST \texttt{/api/reviews/add} with \texttt{\{target\_id, target\_type, rating, comment\}}
+    \item Backend: INSERT INTO Review
+    \item \textbf{Trigger fires automatically}: \texttt{trg\_review\_after\_insert}
+    \item Trigger calls function: \texttt{fn\_calculate\_product\_rating(product\_id)}
+    \item Function calculates: \texttt{AVG(rating)} from all product reviews
+    \item Example: Previous reviews (5, 4), New review (5) $\rightarrow$ Average = (5+4+5)/3 = 4.67
+    \item Trigger updates: \texttt{UPDATE Product SET rating = 4.67}
+    \item All users immediately see updated rating on product pages
+\end{itemize}
+
+\subsubsection{Feature 5: Shop Revenue Analytics}
+
+\textbf{User Experience:}
+\begin{itemize}
+    \item Shop owner logs in, navigates to ShopAnalytics page
+    \item Selects date range: January 1, 2025 - December 31, 2025
+    \item Clicks "Generate Report"
+    \item Views dashboard showing:
+    \begin{itemize}
+        \item Total revenue: 1,980,000 VND
+        \item Total orders: 1
+        \item Total units sold: 2
+        \item Average order value: 1,980,000 VND
+        \item Top 10 selling products with breakdown by variant
+    \end{itemize}
+    \item Exports report to PDF for accounting
+\end{itemize}
+
+\textbf{Behind the Scenes:}
+\begin{itemize}
+    \item Frontend: GET \texttt{/api/shops/4/revenue?from=2025-01-01\&to=2025-12-31}
+    \item Backend: \texttt{CALL sp\_get\_shop\_revenue\_report(shop\_id, from\_date, to\_date)}
+    \item Procedure returns two result sets:
+    \begin{enumerate}
+        \item Shop summary with aggregated metrics
+        \item Top 10 products ordered by revenue (DESC)
+    \end{enumerate}
+    \item Frontend renders charts (revenue trend graph, product pie chart)
+\end{itemize}

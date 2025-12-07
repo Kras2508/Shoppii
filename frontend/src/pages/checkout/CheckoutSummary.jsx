@@ -50,7 +50,7 @@ const CheckoutSummary = ({
 
       <div style={{ marginTop: '12px', fontSize: '12px', color: '#758173', textAlign: 'center' }}>
         By clicking "Place Order" you agree to the 
-        <a href="#" style={{ color: '#647A67' }}> ShopMart Terms</a>
+        <a href="#" style={{ color: '#647A67' }}> Shoppii Terms</a>
       </div>
     </div>
   );

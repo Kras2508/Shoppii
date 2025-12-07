@@ -147,7 +147,7 @@ const Footer = () => {
 
   const customerCareLinks = [
     { id: 1, text: 'Help Center', href: '/help' },
-    { id: 2, text: 'ShopMart Blog', href: '/blog' },
+    { id: 2, text: 'Shoppii Blog', href: '/blog' },
     { id: 3, text: 'Purchase Guide', href: '/guide' },
     { id: 4, text: 'Selling Guide', href: '/sell-guide' },
     { id: 5, text: 'Payment', href: '/payment' },
@@ -156,9 +156,9 @@ const Footer = () => {
   ];
 
   const aboutLinks = [
-    { id: 1, text: 'About ShopMart', href: '/about' },
+    { id: 1, text: 'About Shoppii', href: '/about' },
     { id: 2, text: 'Careers', href: '/careers' },
-    { id: 3, text: 'ShopMart Terms', href: '/terms' },
+    { id: 3, text: 'Shoppii Terms', href: '/terms' },
     { id: 4, text: 'Privacy Policy', href: '/privacy' },
     { id: 5, text: 'Authenticity', href: '/authentic' },
     { id: 6, text: 'Seller Channel', href: '/seller' },
@@ -183,7 +183,7 @@ const Footer = () => {
           <div style={styles.brandSection}>
             <div style={styles.logo}>
               <span style={styles.logoIcon}>🛒</span>
-              <span>ShopMart</span>
+              <span>Shoppii</span>
             </div>
             <p style={styles.tagline}>
               The leading e-commerce platform in HCMUT. 
@@ -226,7 +226,7 @@ const Footer = () => {
 
             {/* About Column */}
             <div style={styles.linkColumn}>
-              <h3 style={styles.columnTitle}>About ShopMart</h3>
+              <h3 style={styles.columnTitle}>About Shoppii</h3>
               <ul style={styles.linkList}>
                 {aboutLinks.map((link) => (
                   <li key={link.id} style={styles.linkItem}>

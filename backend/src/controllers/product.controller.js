@@ -16,97 +16,54 @@ export const getProducts = async (req, res) => {
       limit = 20 
     } = req.query;
 
-    const offset = (page - 1) * limit;
-    let whereClause = 'WHERE 1=1';
-    const params = [];
+    // Call stored procedure sp_get_product_list
+    await pool.query(
+      'CALL sp_get_product_list(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @total_count)',
+      [
+        search || null,
+        category_id || null,
+        shop_id || null,
+        min_price || null,
+        max_price || null,
+        status || null,
+        sort_by,
+        sort_order,
+        parseInt(page),
+        parseInt(limit)
+      ]
+    );
 
-    if (category_id) {
-      whereClause += ' AND p.category_id = ?';
-      params.push(category_id);
-    }
+    // Get the result set (first result is the products)
+    const [results] = await pool.query('SELECT @total_count as total_count');
+    const totalCount = results[0].total_count;
 
-    if (shop_id) {
-      whereClause += ' AND p.shop_id = ?';
-      params.push(shop_id);
-    }
-
-    if (search) {
-      whereClause += ' AND (p.product_name LIKE ? OR p.description LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
-    }
-
-    if (status) {
-      whereClause += ' AND p.status = ?';
-      params.push(status);
-    }
-
-    // Get products with aggregated info
-    const query = `
-      SELECT 
-        p.product_id,
-        p.product_name,
-        p.description,
-        p.image,
-        p.status,
-        p.created_at,
-        p.shop_id,
-        s.shop_name,
-        s.rating as shop_rating,
-        c.category_id,
-        c.category_name,
-        MIN(pi.price) as min_price,
-        MAX(pi.price) as max_price,
-        SUM(pi.stock) as total_stock,
-        COUNT(DISTINCT pi.item_id) as variant_count,
-        COALESCE((
-          SELECT AVG(r.rating)
-          FROM Review r
-          WHERE r.target_id = p.product_id AND r.target_type = 'Product'
-        ), 0) as avg_rating,
-        COALESCE((
-          SELECT COUNT(*)
-          FROM Review r
-          WHERE r.target_id = p.product_id AND r.target_type = 'Product'
-        ), 0) as review_count
-      FROM Product p
-      INNER JOIN Shop s ON p.shop_id = s.shop_id
-      INNER JOIN Category c ON p.category_id = c.category_id
-      LEFT JOIN ProductItem pi ON p.product_id = pi.product_id
-      ${whereClause}
-      GROUP BY p.product_id, p.product_name, p.description, p.image, p.status, 
-               p.created_at, p.shop_id, s.shop_name, s.rating, c.category_id, c.category_name
-      ${min_price ? 'HAVING min_price >= ?' : ''}
-      ${max_price ? (min_price ? ' AND max_price <= ?' : 'HAVING max_price <= ?') : ''}
-      ORDER BY ${sort_by === 'price' ? 'min_price' : sort_by === 'rating' ? 'avg_rating' : 'p.created_at'} ${sort_order}
-      LIMIT ? OFFSET ?
-    `;
-
-    if (min_price) params.push(min_price);
-    if (max_price) params.push(max_price);
-    params.push(parseInt(limit), parseInt(offset));
-
-    const [products] = await pool.query(query, params);
-
-    // Get total count
-    const countQuery = `
-      SELECT COUNT(DISTINCT p.product_id) as total
-      FROM Product p
-      INNER JOIN Shop s ON p.shop_id = s.shop_id
-      INNER JOIN Category c ON p.category_id = c.category_id
-      LEFT JOIN ProductItem pi ON p.product_id = pi.product_id
-      ${whereClause}
-    `;
-    const [countResult] = await pool.query(countQuery, params.slice(0, -2));
+    // Get products from the procedure result
+    // Note: The procedure returns products as first result set
+    const [[products]] = await pool.query(
+      'CALL sp_get_product_list(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @total)',
+      [
+        search || null,
+        category_id || null,
+        shop_id || null,
+        min_price || null,
+        max_price || null,
+        status || null,
+        sort_by,
+        sort_order,
+        parseInt(page),
+        parseInt(limit)
+      ]
+    );
 
     res.json({
       success: true,
       data: {
-        products,
+        products: products || [],
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: countResult[0].total,
-          totalPages: Math.ceil(countResult[0].total / limit)
+          total: totalCount || 0,
+          totalPages: Math.ceil((totalCount || 0) / limit)
         }
       }
     });
@@ -223,29 +180,50 @@ export const createProduct = async (req, res) => {
 
     await connection.beginTransaction();
 
-    // Insert product (without image - store in variants instead)
-    const [productResult] = await connection.query(`
-      INSERT INTO Product (shop_id, category_id, product_name, description)
-      VALUES (?, ?, ?, ?)
-    `, [shopId, category_id, product_name, description || null]);
+    // Call stored procedure sp_add_product
+    const image = variants && variants.length > 0 ? variants[0].image_url : null;
+    await connection.query(
+      'CALL sp_add_product(?, ?, ?, ?, ?, @product_id, @status)',
+      [shopId, category_id, product_name, description || null, image]
+    );
 
-    const productId = productResult.insertId;
+    // Get output parameters
+    const [[result]] = await connection.query('SELECT @product_id as product_id, @status as status');
+    
+    if (result.product_id === -1) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: result.status
+      });
+    }
 
-    // Insert variants if provided
+    const productId = result.product_id;
+
+    // Insert variants if provided using sp_add_product_item
     if (variants && variants.length > 0) {
       for (const variant of variants) {
-        await connection.query(`
-          INSERT INTO ProductItem (product_id, shop_id, color, type, price, stock, image_url)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [
-          productId, 
-          shopId, 
-          variant.color || 'Default', 
-          variant.type || 'Standard',
-          variant.price || 0,
-          variant.stock || 0,
-          variant.image_url || null
-        ]);
+        await connection.query(
+          'CALL sp_add_product_item(?, ?, ?, ?, ?, ?, ?, @item_id, @item_status)',
+          [
+            productId,
+            shopId,
+            variant.color || 'Default',
+            variant.type || 'Standard',
+            variant.price || 0,
+            variant.stock || 0,
+            variant.image_url || null
+          ]
+        );
+        
+        const [[itemResult]] = await connection.query('SELECT @item_id as item_id, @item_status as status');
+        if (itemResult.item_id === -1) {
+          await connection.rollback();
+          return res.status(400).json({
+            success: false,
+            message: itemResult.status
+          });
+        }
       }
     }
 
@@ -309,33 +287,28 @@ export const updateProduct = async (req, res) => {
 
     await connection.beginTransaction();
 
-    // Update Product basic info
-    const updateFields = [];
-    const updateValues = [];
+    // Call stored procedure sp_update_product
+    const image = variants && variants.length > 0 ? variants[0].image_url : null;
+    await connection.query(
+      'CALL sp_update_product(?, ?, ?, ?, ?, @success, @message)',
+      [
+        id,
+        product_name || null,
+        description !== undefined ? description : null,
+        image,
+        status || null
+      ]
+    );
 
-    if (category_id) {
-      updateFields.push('category_id = ?');
-      updateValues.push(category_id);
-    }
-    if (product_name) {
-      updateFields.push('product_name = ?');
-      updateValues.push(product_name);
-    }
-    if (description !== undefined) {
-      updateFields.push('description = ?');
-      updateValues.push(description);
-    }
-    if (status) {
-      updateFields.push('status = ?');
-      updateValues.push(status);
-    }
-
-    if (updateFields.length > 0) {
-      updateValues.push(id);
-      await connection.query(
-        `UPDATE Product SET ${updateFields.join(', ')} WHERE product_id = ?`,
-        updateValues
-      );
+    // Get output parameters
+    const [[result]] = await connection.query('SELECT @success as success, @message as message');
+    
+    if (!result.success) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: result.message
+      });
     }
 
     // Update variants if provided
@@ -343,21 +316,30 @@ export const updateProduct = async (req, res) => {
       // Delete old variants
       await connection.query('DELETE FROM ProductItem WHERE product_id = ?', [id]);
       
-      // Insert new variants
+      // Insert new variants using sp_add_product_item
       for (const variant of variants) {
         if (variant.color && variant.type && variant.price !== undefined && variant.stock !== undefined) {
-          await connection.query(`
-            INSERT INTO ProductItem (product_id, shop_id, color, type, price, stock, image_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-          `, [
-            id,
-            shopId,
-            variant.color || 'Default',
-            variant.type || 'Standard',
-            variant.price,
-            variant.stock,
-            variant.image_url || null
-          ]);
+          await connection.query(
+            'CALL sp_add_product_item(?, ?, ?, ?, ?, ?, ?, @item_id, @item_status)',
+            [
+              id,
+              shopId,
+              variant.color || 'Default',
+              variant.type || 'Standard',
+              variant.price,
+              variant.stock,
+              variant.image_url || null
+            ]
+          );
+          
+          const [[itemResult]] = await connection.query('SELECT @item_id as item_id, @item_status as status');
+          if (itemResult.item_id === -1) {
+            await connection.rollback();
+            return res.status(400).json({
+              success: false,
+              message: itemResult.status
+            });
+          }
         }
       }
     }
@@ -366,7 +348,7 @@ export const updateProduct = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Product updated successfully'
+      message: result.message
     });
 
   } catch (error) {
@@ -420,20 +402,28 @@ export const deleteProduct = async (req, res) => {
 
     await connection.beginTransaction();
 
-    // Delete product variants first (due to FK constraint)
-    await connection.query('DELETE FROM ProductItem WHERE product_id = ?', [id]);
+    // Call stored procedure sp_delete_product
+    await connection.query(
+      'CALL sp_delete_product(?, @success, @message)',
+      [id]
+    );
 
-    // Delete reviews for this product
-    await connection.query('DELETE FROM Review WHERE target_type = "Product" AND target_id = ?', [id]);
-
-    // Delete product
-    await connection.query('DELETE FROM Product WHERE product_id = ?', [id]);
+    // Get output parameters
+    const [[result]] = await connection.query('SELECT @success as success, @message as message');
+    
+    if (!result.success) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
 
     await connection.commit();
 
     res.json({
       success: true,
-      message: 'Product deleted successfully'
+      message: result.message
     });
 
   } catch (error) {
@@ -485,28 +475,45 @@ export const upsertVariant = async (req, res) => {
     }
 
     if (item_id) {
-      // Update existing variant
-      await pool.query(`
-        UPDATE ProductItem 
-        SET color = ?, type = ?, price = ?, stock = ?, image_url = ?
-        WHERE item_id = ? AND product_id = ? AND shop_id = ?
-      `, [color, type, price, stock, image_url, item_id, id, shopId]);
+      // Update existing variant using sp_update_product_item
+      await pool.query(
+        'CALL sp_update_product_item(?, ?, ?, ?, @success, @message)',
+        [item_id, price, stock, image_url]
+      );
+
+      const [[result]] = await pool.query('SELECT @success as success, @message as message');
+      
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          message: result.message
+        });
+      }
 
       res.json({
         success: true,
-        message: 'Variant updated successfully'
+        message: result.message
       });
     } else {
-      // Create new variant
-      const [result] = await pool.query(`
-        INSERT INTO ProductItem (product_id, shop_id, color, type, price, stock, image_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [id, shopId, color, type, price, stock, image_url]);
+      // Create new variant using sp_add_product_item
+      await pool.query(
+        'CALL sp_add_product_item(?, ?, ?, ?, ?, ?, ?, @item_id, @status)',
+        [id, shopId, color, type, price, stock, image_url]
+      );
+
+      const [[result]] = await pool.query('SELECT @item_id as item_id, @status as status');
+      
+      if (result.item_id === -1) {
+        return res.status(400).json({
+          success: false,
+          message: result.status
+        });
+      }
 
       res.status(201).json({
         success: true,
         message: 'Variant created successfully',
-        data: { item_id: result.insertId }
+        data: { item_id: result.item_id }
       });
     }
 
@@ -541,22 +548,24 @@ export const deleteVariant = async (req, res) => {
 
     const shopId = shops[0].shop_id;
 
-    // Delete variant
-    const [result] = await pool.query(
-      'DELETE FROM ProductItem WHERE item_id = ? AND product_id = ? AND shop_id = ?',
-      [variantId, id, shopId]
+    // Call stored procedure sp_delete_product_item
+    await pool.query(
+      'CALL sp_delete_product_item(?, @success, @message)',
+      [variantId]
     );
 
-    if (result.affectedRows === 0) {
+    const [[result]] = await pool.query('SELECT @success as success, @message as message');
+    
+    if (!result.success) {
       return res.status(404).json({
         success: false,
-        message: 'Variant not found'
+        message: result.message
       });
     }
 
     res.json({
       success: true,
-      message: 'Variant deleted successfully'
+      message: result.message
     });
 
   } catch (error) {
@@ -686,38 +695,3 @@ export const getShopProducts = async (req, res) => {
     });
   }
 };
-
-// Get product statistics using stored procedure
-export const getProductStatistics = async (req, res) => {
-  try {
-    const { category_id, shop_id, min_price, max_price } = req.query;
-
-    // Call stored procedure sp_get_product_statistics
-    const [results] = await pool.query(
-      'CALL sp_get_product_statistics(?, ?, ?, ?)',
-      [
-        category_id || null,
-        shop_id || null,
-        min_price || null,
-        max_price || null
-      ]
-    );
-
-    res.json({
-      success: true,
-      data: {
-        statistics: results[0] // First result set from procedure
-      }
-    });
-
-  } catch (error) {
-    console.error('Get product statistics error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get product statistics',
-      error: error.message
-    });
-  }
-};
-
-

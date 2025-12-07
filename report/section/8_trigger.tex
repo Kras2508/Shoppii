@@ -1,0 +1,627 @@
+\section{Database Triggers}
+
+This section documents the automated database triggers that enforce business rules, maintain data integrity, and handle derived attributes.
+
+\subsection{Order Management Triggers}
+
+\subsubsection{Trigger: Order Item Before Insert}
+
+\paragraph{Purpose:} Validates stock availability and sets derived values (price\_at\_purchase, shop\_id) before inserting order items.
+
+\begin{lstlisting}[language=SQL, caption=Trigger: trg\_order\_item\_before\_insert, label=lst:trg_order_item_before]
+CREATE TRIGGER trg_order_item_before_insert
+BEFORE INSERT ON OrderItem
+FOR EACH ROW
+BEGIN
+    DECLARE v_item_price DECIMAL(10, 2);
+    DECLARE v_item_stock INT;
+    DECLARE v_shop_id INT;
+    
+    -- Get product item details
+    SELECT price, stock, shop_id
+    INTO v_item_price, v_item_stock, v_shop_id
+    FROM ProductItem
+    WHERE item_id = NEW.item_id;
+    
+    -- Validate item exists
+    IF v_item_price IS NULL THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'Product item does not exist';
+    END IF;
+    
+    -- Check stock availability
+    IF v_item_stock < NEW.quantity THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'Insufficient stock for this product item';
+    END IF;
+    
+    -- Set price at purchase if not provided
+    IF NEW.price_at_purchase IS NULL OR NEW.price_at_purchase = 0 THEN
+        SET NEW.price_at_purchase = v_item_price;
+    END IF;
+    
+    -- Set shop_id if not provided
+    IF NEW.shop_id IS NULL OR NEW.shop_id = 0 THEN
+        SET NEW.shop_id = v_shop_id;
+    END IF;
+END$$
+\end{lstlisting}
+
+\paragraph{Trigger Type:} BEFORE INSERT
+
+\paragraph{Related Tables:} ORDERITEM, PRODUCTITEM
+
+\paragraph{Business Logic:}
+This trigger enforces critical order integrity:
+\begin{enumerate}
+    \item \textbf{Existence Validation}: Ensures item\_id references valid ProductItem
+    \item \textbf{Stock Validation}: Prevents ordering more items than available stock
+    \item \textbf{Price Capture}: Records current price as price\_at\_purchase for historical accuracy
+    \item \textbf{Shop Association}: Automatically links order item to correct shop
+\end{enumerate}
+
+\paragraph{Example Scenario:}
+
+\begin{lstlisting}[language=SQL]
+-- Scenario 1: Valid order item insertion
+-- ProductItem 1: price=1,000,000, stock=10
+INSERT INTO OrderItem (order_id, item_id, quantity)
+VALUES (1, 1, 2);
+-- Success: price_at_purchase=1,000,000, shop_id set automatically
+
+-- Scenario 2: Insufficient stock
+-- ProductItem 2: stock=5
+INSERT INTO OrderItem (order_id, item_id, quantity)
+VALUES (1, 2, 10);
+-- Error: 'Insufficient stock for this product item'
+
+-- Scenario 3: Invalid item_id
+INSERT INTO OrderItem (order_id, item_id, quantity)
+VALUES (1, 999, 1);
+-- Error: 'Product item does not exist'
+\end{lstlisting}
+
+\subsubsection{Trigger: Order Item After Insert}
+
+\paragraph{Purpose:} Decreases product stock after order item insertion and updates product status if out of stock.
+
+\begin{lstlisting}[language=SQL, caption=Trigger: trg\_order\_item\_after\_insert, label=lst:trg_order_item_after]
+CREATE TRIGGER trg_order_item_after_insert
+AFTER INSERT ON OrderItem
+FOR EACH ROW
+BEGIN
+    DECLARE v_product_id INT;
+    DECLARE v_total_stock INT;
+    
+    -- Decrease product item stock
+    UPDATE ProductItem
+    SET stock = stock - NEW.quantity
+    WHERE item_id = NEW.item_id;
+    
+    -- Get product_id and check total stock
+    SELECT product_id INTO v_product_id
+    FROM ProductItem
+    WHERE item_id = NEW.item_id;
+    
+    SELECT SUM(stock) INTO v_total_stock
+    FROM ProductItem
+    WHERE product_id = v_product_id;
+    
+    -- Update product status if all variants are out of stock
+    IF v_total_stock <= 0 THEN
+        UPDATE Product
+        SET status = 'Out of stock'
+        WHERE product_id = v_product_id;
+    END IF;
+END$$
+\end{lstlisting}
+
+\paragraph{Trigger Type:} AFTER INSERT
+
+\paragraph{Related Tables:} ORDERITEM, PRODUCTITEM, PRODUCT
+
+\paragraph{Business Logic:}
+Maintains inventory consistency:
+\begin{enumerate}
+    \item \textbf{Stock Deduction}: Automatically decreases ProductItem stock by ordered quantity
+    \item \textbf{Aggregate Check}: Calculates total stock across all product variants
+    \item \textbf{Status Update}: Marks product as 'Out of stock' when all variants depleted
+\end{enumerate}
+
+\paragraph{Example Scenario:}
+
+\begin{lstlisting}[language=SQL]
+-- Before: iPhone 15 has 2 variants
+-- Variant 1 (Red): stock=10
+-- Variant 2 (Blue): stock=5
+
+-- Customer orders 10 Red iPhones
+INSERT INTO OrderItem (order_id, item_id, quantity)
+VALUES (1, 1, 10);
+
+-- After trigger execution:
+-- Variant 1 (Red): stock=0
+-- Variant 2 (Blue): stock=5
+-- Product status: Still 'Active' (total stock = 5)
+
+-- Customer orders 5 Blue iPhones
+INSERT INTO OrderItem (order_id, item_id, quantity)
+VALUES (1, 2, 5);
+
+-- After trigger execution:
+-- Variant 1 (Red): stock=0
+-- Variant 2 (Blue): stock=0
+-- Product status: 'Out of stock' (total stock = 0)
+\end{lstlisting}
+
+\subsubsection{Trigger: Order After Update (Stock Restoration)}
+
+\paragraph{Purpose:} Restores product stock when an order is cancelled, using cursor to iterate through order items.
+
+\begin{lstlisting}[language=SQL, caption=Trigger: trg\_order\_after\_update, label=lst:trg_order_after_update]
+CREATE TRIGGER trg_order_after_update
+AFTER UPDATE ON `Order`
+FOR EACH ROW
+BEGIN
+    DECLARE v_product_id INT;
+    DECLARE v_total_stock INT;
+    
+    -- If order status changed from non-Cancelled to Cancelled
+    IF OLD.status != 'Cancelled' AND NEW.status = 'Cancelled' THEN
+        BEGIN
+            DECLARE done INT DEFAULT FALSE;
+            DECLARE v_item_id INT;
+            DECLARE v_quantity INT;
+            
+            DECLARE item_cursor CURSOR FOR
+                SELECT item_id, quantity
+                FROM OrderItem
+                WHERE order_id = NEW.order_id;
+            
+            DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+            
+            OPEN item_cursor;
+            
+            restore_loop: LOOP
+                FETCH item_cursor INTO v_item_id, v_quantity;
+                IF done THEN
+                    LEAVE restore_loop;
+                END IF;
+                
+                -- Restore stock for this item
+                UPDATE ProductItem
+                SET stock = stock + v_quantity
+                WHERE item_id = v_item_id;
+                
+                -- Get product_id
+                SELECT product_id INTO v_product_id
+                FROM ProductItem
+                WHERE item_id = v_item_id;
+                
+                -- Check total stock for this product
+                SELECT SUM(stock) INTO v_total_stock
+                FROM ProductItem
+                WHERE product_id = v_product_id;
+                
+                -- Update product status back to Active if stock available
+                IF v_total_stock > 0 THEN
+                    UPDATE Product
+                    SET status = 'Active'
+                    WHERE product_id = v_product_id 
+                      AND status = 'Out of stock';
+                END IF;
+            END LOOP;
+            
+            CLOSE item_cursor;
+        END;
+    END IF;
+END$$
+\end{lstlisting}
+
+\paragraph{Trigger Type:} AFTER UPDATE
+
+\paragraph{Related Tables:} ORDER, ORDERITEM, PRODUCTITEM, PRODUCT
+
+\paragraph{Business Logic:}
+Handles order cancellation with cursor-based iteration:
+\begin{enumerate}
+    \item \textbf{Status Change Detection}: Only executes when order status changes to 'Cancelled'
+    \item \textbf{Cursor Loop}: Iterates through all OrderItems in the cancelled order
+    \item \textbf{Stock Restoration}: Adds back ordered quantity to ProductItem stock
+    \item \textbf{Status Reactivation}: Changes Product status from 'Out of stock' to 'Active'
+\end{enumerate}
+
+\paragraph{Example Scenario:}
+
+\begin{lstlisting}[language=SQL]
+-- Order 1 contains:
+-- Item 1 (Red iPhone): quantity=10
+-- Item 2 (Blue iPhone): quantity=5
+
+-- Before cancellation:
+-- Variant 1: stock=0
+-- Variant 2: stock=0
+-- Product status: 'Out of stock'
+
+-- Cancel the order
+UPDATE `Order` SET status = 'Cancelled' WHERE order_id = 1;
+
+-- After trigger execution:
+-- Variant 1: stock=10 (restored)
+-- Variant 2: stock=5 (restored)
+-- Product status: 'Active' (reactivated)
+\end{lstlisting}
+
+\subsection{Review Management Triggers}
+
+\subsubsection{Trigger: Review Before Insert (Verified Purchase)}
+
+\paragraph{Purpose:} Enforces verified purchase requirement - customers can only review products/shops from delivered orders.
+
+\begin{lstlisting}[language=SQL, caption=Trigger: trg\_review\_before\_insert, label=lst:trg_review_before]
+CREATE TRIGGER trg_review_before_insert
+BEFORE INSERT ON Review
+FOR EACH ROW
+BEGIN
+    -- Enforce rating between 1 and 5
+    IF NEW.rating < 1 OR NEW.rating > 5 THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'Rating must be between 1 and 5';
+    END IF;
+    
+    -- Validate based on target type
+    IF NEW.target_type = 'Product' THEN
+        -- Check if customer purchased this product
+        IF NOT EXISTS (
+            SELECT 1
+            FROM OrderItem oi
+            INNER JOIN `Order` o ON oi.order_id = o.order_id
+            INNER JOIN ProductItem pi ON oi.item_id = pi.item_id
+            WHERE pi.product_id = NEW.target_id
+              AND o.customer_id = NEW.customer_id
+              AND o.status = 'Delivered'
+        ) THEN
+            SIGNAL SQLSTATE '45000' 
+            SET MESSAGE_TEXT = 
+                'Can only review products from delivered orders';
+        END IF;
+    ELSEIF NEW.target_type = 'Shop' THEN
+        -- Check if customer purchased from this shop
+        IF NOT EXISTS (
+            SELECT 1
+            FROM OrderItem oi
+            INNER JOIN `Order` o ON oi.order_id = o.order_id
+            WHERE oi.shop_id = NEW.target_id
+              AND o.customer_id = NEW.customer_id
+              AND o.status = 'Delivered'
+        ) THEN
+            SIGNAL SQLSTATE '45000' 
+            SET MESSAGE_TEXT = 
+                'Can only review shops you have purchased from';
+        END IF;
+    END IF;
+END$$
+\end{lstlisting}
+
+\paragraph{Trigger Type:} BEFORE INSERT
+
+\paragraph{Related Tables:} REVIEW, ORDER, ORDERITEM, PRODUCTITEM
+
+\paragraph{Business Logic:}
+Implements verified purchase policy:
+\begin{enumerate}
+    \item \textbf{Rating Validation}: Ensures rating is between 1 and 5
+    \item \textbf{Product Reviews}: Requires customer to have received (status='Delivered') the product
+    \item \textbf{Shop Reviews}: Requires customer to have completed purchase from the shop
+    \item \textbf{Fraud Prevention}: Prevents fake reviews from non-customers
+\end{enumerate}
+
+\paragraph{Example Scenario:}
+
+\begin{lstlisting}[language=SQL]
+-- Scenario 1: Valid product review (customer received product)
+-- Customer 1 has Order 1 (status='Delivered') containing Product 1
+INSERT INTO Review (customer_id, target_type, target_id, rating, comment)
+VALUES (1, 'Product', 1, 5, 'Great product!');
+-- Success
+
+-- Scenario 2: Invalid review (customer never purchased product)
+INSERT INTO Review (customer_id, target_type, target_id, rating, comment)
+VALUES (2, 'Product', 1, 5, 'Fake review');
+-- Error: 'Can only review products from delivered orders'
+
+-- Scenario 3: Invalid rating
+INSERT INTO Review (customer_id, target_type, target_id, rating, comment)
+VALUES (1, 'Product', 1, 10, 'Rating too high');
+-- Error: 'Rating must be between 1 and 5'
+
+-- Scenario 4: Valid shop review
+INSERT INTO Review (customer_id, target_type, target_id, rating, comment)
+VALUES (1, 'Shop', 4, 4, 'Good service');
+-- Success (Customer 1 bought from Shop 4)
+\end{lstlisting}
+
+\subsubsection{Trigger: Review After Insert (Rating Update)}
+
+\paragraph{Purpose:} Automatically updates product or shop rating after a new review is submitted.
+
+\begin{lstlisting}[language=SQL, caption=Trigger: trg\_review\_after\_insert, label=lst:trg_review_after]
+CREATE TRIGGER trg_review_after_insert
+AFTER INSERT ON Review
+FOR EACH ROW
+BEGIN
+    DECLARE v_avg_rating DECIMAL(3, 2);
+    
+    IF NEW.target_type = 'Shop' THEN
+        -- Update shop rating
+        SELECT AVG(rating) INTO v_avg_rating
+        FROM Review
+        WHERE target_type = 'Shop' AND target_id = NEW.target_id;
+        
+        UPDATE Shop
+        SET rating = COALESCE(v_avg_rating, 0)
+        WHERE shop_id = NEW.target_id;
+    
+    ELSEIF NEW.target_type = 'Product' THEN
+        -- Update product rating
+        SELECT AVG(rating) INTO v_avg_rating
+        FROM Review
+        WHERE target_type = 'Product' AND target_id = NEW.target_id;
+        
+        UPDATE Product
+        SET rating = COALESCE(v_avg_rating, 0)
+        WHERE product_id = NEW.target_id;
+    END IF;
+END$$
+\end{lstlisting}
+
+\paragraph{Trigger Type:} AFTER INSERT
+
+\paragraph{Related Tables:} REVIEW, SHOP, PRODUCT
+
+\paragraph{Business Logic:}
+Maintains denormalized rating data for performance:
+\begin{enumerate}
+    \item \textbf{Average Calculation}: Computes AVG(rating) from all reviews
+    \item \textbf{Shop Rating Update}: Updates Shop.rating for shop reviews
+    \item \textbf{Product Rating Update}: Updates Product.rating for product reviews
+    \item \textbf{Real-time Sync}: Rating immediately reflects new review
+\end{enumerate}
+
+\paragraph{Example Scenario:}
+
+\begin{lstlisting}[language=SQL]
+-- Before: Product 1 has 2 reviews (5 stars, 4 stars)
+-- Product.rating = 4.50
+
+-- Customer adds 3-star review
+INSERT INTO Review (customer_id, target_type, target_id, rating, comment)
+VALUES (3, 'Product', 1, 3, 'Average product');
+
+-- After trigger execution:
+-- Product 1 now has 3 reviews: (5 + 4 + 3) / 3 = 4.00
+-- Product.rating = 4.00
+
+SELECT rating FROM Product WHERE product_id = 1;
+-- Result: 4.00
+\end{lstlisting}
+
+\subsection{Inventory Management Triggers}
+
+\subsubsection{Trigger: Product Item Before Update}
+
+\paragraph{Purpose:} Validates business constraints before updating product item (prevents negative stock/price).
+
+\begin{lstlisting}[language=SQL, caption=Trigger: trg\_product\_item\_before\_update, label=lst:trg_product_item_before_update]
+CREATE TRIGGER trg_product_item_before_update
+BEFORE UPDATE ON ProductItem
+FOR EACH ROW
+BEGIN
+    -- Prevent negative stock
+    IF NEW.stock < 0 THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'Product item stock cannot be negative';
+    END IF;
+    
+    -- Prevent negative price
+    IF NEW.price < 0 THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'Product item price cannot be negative';
+    END IF;
+END$$
+\end{lstlisting}
+
+\paragraph{Trigger Type:} BEFORE UPDATE
+
+\paragraph{Related Tables:} PRODUCTITEM
+
+\paragraph{Business Logic:}
+Enforces CHECK constraints at trigger level:
+\begin{enumerate}
+    \item \textbf{Stock Constraint}: Prevents stock from becoming negative
+    \item \textbf{Price Constraint}: Prevents price from becoming negative
+    \item \textbf{Data Integrity}: Ensures business rules are enforced at database level
+\end{enumerate}
+
+\paragraph{Example Scenario:}
+
+\begin{lstlisting}[language=SQL]
+-- Scenario 1: Valid stock update
+UPDATE ProductItem SET stock = 50 WHERE item_id = 1;
+-- Success
+
+-- Scenario 2: Attempt negative stock
+UPDATE ProductItem SET stock = -10 WHERE item_id = 1;
+-- Error: 'Product item stock cannot be negative'
+
+-- Scenario 3: Attempt negative price
+UPDATE ProductItem SET price = -1000 WHERE item_id = 1;
+-- Error: 'Product item price cannot be negative'
+\end{lstlisting}
+
+\subsection{Account Management Triggers}
+
+\subsubsection{Trigger: Account After Insert (Subclass Creation)}
+
+\paragraph{Purpose:} Automatically creates corresponding Customer/Shop/Admin record and related entities (Cart for Customer) when Account is inserted.
+
+\begin{lstlisting}[language=SQL, caption=Trigger: trg\_account\_after\_insert, label=lst:trg_account_after]
+CREATE TRIGGER trg_account_after_insert
+AFTER INSERT ON Account
+FOR EACH ROW
+BEGIN
+    -- If customer, create customer record and cart
+    IF NEW.role = 'Customer' THEN
+        INSERT INTO Customer (customer_id, address, add_phone, 
+                             total_spent, total_order)
+        VALUES (NEW.account_id, NULL, NULL, 0, 0);
+        
+        INSERT INTO Cart (customer_id)
+        VALUES (NEW.account_id);
+    
+    -- If shop, create shop record
+    ELSEIF NEW.role = 'Shop' THEN
+        INSERT INTO Shop (shop_id, shop_name, shop_phone, 
+                         address_shop, rating)
+        VALUES (NEW.account_id, CONCAT('Shop ', NEW.account_id), 
+                NULL, NULL, 0);
+    
+    -- If admin, create admin record
+    ELSEIF NEW.role = 'Admin' THEN
+        INSERT INTO Admin (admin_id, role, note)
+        VALUES (NEW.account_id, 'Support', NULL);
+    END IF;
+END$$
+\end{lstlisting}
+
+\paragraph{Trigger Type:} AFTER INSERT
+
+\paragraph{Related Tables:} ACCOUNT, CUSTOMER, SHOP, ADMIN, CART
+
+\paragraph{Business Logic:}
+Implements inheritance pattern (Account superclass):
+\begin{enumerate}
+    \item \textbf{Customer Creation}: Creates Customer record + Cart for role='Customer'
+    \item \textbf{Shop Creation}: Creates Shop record with default name for role='Shop'
+    \item \textbf{Admin Creation}: Creates Admin record for role='Admin'
+    \item \textbf{Referential Integrity}: Ensures 1:1 relationship between Account and subclass
+\end{enumerate}
+
+\paragraph{Example Scenario:}
+
+\begin{lstlisting}[language=SQL]
+-- Create customer account
+INSERT INTO Account (email, password, full_name, phone, role)
+VALUES ('customer@email.com', 'hash123', 'John Doe', 
+        '0123456789', 'Customer');
+-- account_id = 10
+
+-- After trigger execution:
+-- Customer table: customer_id=10, total_spent=0, total_order=0
+-- Cart table: cart_id=10, customer_id=10
+
+-- Create shop account
+INSERT INTO Account (email, password, full_name, phone, role)
+VALUES ('shop@email.com', 'hash456', 'Shop Owner', 
+        '0987654321', 'Shop');
+-- account_id = 11
+
+-- After trigger execution:
+-- Shop table: shop_id=11, shop_name='Shop 11', rating=0
+\end{lstlisting}
+
+\subsubsection{Trigger: Customer Before Insert (Code Generation)}
+
+\paragraph{Purpose:} Auto-generates customer\_code with CUST prefix (CUST00001, CUST00002, ...) based on customer\_id.
+
+\begin{lstlisting}[language=SQL, caption=Trigger: trg\_customer\_before\_insert, label=lst:trg_customer_before]
+CREATE TRIGGER trg_customer_before_insert
+BEFORE INSERT ON Customer
+FOR EACH ROW
+BEGIN
+    -- Generate customer_code from customer_id
+    SET NEW.customer_code = CONCAT('CUST', LPAD(NEW.customer_id, 5, '0'));
+END$$
+\end{lstlisting}
+
+\paragraph{Trigger Type:} BEFORE INSERT
+
+\paragraph{Related Tables:} CUSTOMER
+
+\paragraph{Business Logic:}
+Implements auto-generated business key:
+\begin{enumerate}
+    \item \textbf{Code Format}: CUSTxxxxx where xxxxx is zero-padded customer\_id
+    \item \textbf{LPAD Function}: Pads ID with leading zeros to 5 digits
+    \item \textbf{Consistency}: Ensures all customer codes follow same format
+\end{enumerate}
+
+\paragraph{Example Scenario:}
+
+\begin{lstlisting}[language=SQL]
+-- Insert customer with ID 1
+INSERT INTO Customer (customer_id, address, total_spent, total_order)
+VALUES (1, '123 Main St', 0, 0);
+
+-- After trigger: customer_code = 'CUST00001'
+
+-- Insert customer with ID 25
+INSERT INTO Customer (customer_id, address, total_spent, total_order)
+VALUES (25, '456 Elm St', 0, 0);
+
+-- After trigger: customer_code = 'CUST00025'
+
+-- Insert customer with ID 1000
+INSERT INTO Customer (customer_id, address, total_spent, total_order)
+VALUES (1000, '789 Oak St', 0, 0);
+
+-- After trigger: customer_code = 'CUST01000'
+\end{lstlisting}
+
+\subsubsection{Trigger: Shop Before Insert (Code Generation)}
+
+\paragraph{Purpose:} Auto-generates shop\_code with SHOP prefix (SHOP00001, SHOP00002, ...) based on shop\_id.
+
+\begin{lstlisting}[language=SQL, caption=Trigger: trg\_shop\_before\_insert, label=lst:trg_shop_before]
+CREATE TRIGGER trg_shop_before_insert
+BEFORE INSERT ON Shop
+FOR EACH ROW
+BEGIN
+    -- Generate shop_code from shop_id
+    SET NEW.shop_code = CONCAT('SHOP', LPAD(NEW.shop_id, 5, '0'));
+END$$
+\end{lstlisting}
+
+\paragraph{Trigger Type:} BEFORE INSERT
+
+\paragraph{Related Tables:} SHOP
+
+\paragraph{Business Logic:}
+Same pattern as customer\_code generation:
+\begin{enumerate}
+    \item \textbf{Code Format}: SHOPxxxxx where xxxxx is zero-padded shop\_id
+    \item \textbf{LPAD Function}: Pads ID with leading zeros to 5 digits
+    \item \textbf{Business Key}: Provides user-friendly identifier for shops
+\end{enumerate}
+
+\paragraph{Example Scenario:}
+
+\begin{lstlisting}[language=SQL]
+-- Insert shop with ID 4
+INSERT INTO Shop (shop_id, shop_name, rating)
+VALUES (4, 'Tech Store', 0);
+
+-- After trigger: shop_code = 'SHOP00004'
+
+-- Insert shop with ID 100
+INSERT INTO Shop (shop_id, shop_name, rating)
+VALUES (100, 'Fashion Hub', 0);
+
+-- After trigger: shop_code = 'SHOP00100'
+
+SELECT shop_id, shop_code, shop_name FROM Shop;
+-- Results:
+-- 4  | SHOP00004 | Tech Store
+-- 100| SHOP00100 | Fashion Hub
+\end{lstlisting}
+

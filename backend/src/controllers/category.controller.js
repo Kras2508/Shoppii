@@ -3,6 +3,10 @@ import { pool } from '../config/database.js';
 // Get all categories (public)
 export const getCategories = async (req, res) => {
   try {
+    // Call stored procedure sp_get_category_hierarchy
+    const [[hierarchy]] = await pool.query('CALL sp_get_category_hierarchy()');
+    
+    // Also get flat list with product count
     const [categories] = await pool.query(`
       SELECT 
         c.*,
@@ -15,7 +19,7 @@ export const getCategories = async (req, res) => {
       ORDER BY c.parent_category_id IS NULL DESC, c.category_name
     `);
 
-    // Build tree structure
+    // Build tree structure from flat list
     const categoryMap = {};
     const rootCategories = [];
 
@@ -40,7 +44,8 @@ export const getCategories = async (req, res) => {
       success: true,
       data: {
         categories: rootCategories,
-        flat: categories
+        flat: categories,
+        hierarchy: hierarchy
       }
     });
 
@@ -75,9 +80,15 @@ export const getCategoryById = async (req, res) => {
       });
     }
 
-    // Get subcategories
-    const [subcategories] = await pool.query(
-      'SELECT * FROM Category WHERE parent_category_id = ?',
+    // Get all children using stored procedure
+    const [[allChildren]] = await pool.query(
+      'CALL sp_get_category_all_children(?)',
+      [id]
+    );
+    
+    // Get all parents using stored procedure
+    const [[allParents]] = await pool.query(
+      'CALL sp_get_category_all_parents(?)',
       [id]
     );
 
@@ -85,7 +96,8 @@ export const getCategoryById = async (req, res) => {
       success: true,
       data: {
         ...categories[0],
-        subcategories
+        all_children: allChildren,
+        all_parents: allParents
       }
     });
 

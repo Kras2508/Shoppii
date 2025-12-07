@@ -1,0 +1,36 @@
+    \documentclass[12pt]{report}
+    \input{section/packages}
+    \lhead{\includegraphics[scale = 0.05]{img/logo_alt.png} HCMUT}
+    \rhead{Database Systems}
+    \cfoot{}
+    \lfoot{Group 9}
+    \rfoot{page \thepage\ of \pageref{LastPage}}
+    \fancypagestyle{firstpagestyle}
+
+
+    \begin{document}
+    \input{section/0_title}
+
+    \newpage
+    \renewcommand{\contentsname}{Table of Contents}
+    \renewcommand{\listfigurename}{List of Figures}
+    \renewcommand{\listtablename}{List of Tables}
+
+    \tableofcontents
+    \listoffigures
+    \listoftables
+    \newpage
+
+    \input{section/2_intro}
+    \input{section/3_description}
+    \input{section/4_diagram}
+    \input{section/5_Schema}
+    \input{section/6_Tables}
+    \input{section/7_func}
+    \input{section/8_trigger}
+    \input{section/9_Demo}
+    \input{section/10_Video}
+    \input{section/conclu}
+    \end{document}
+
+

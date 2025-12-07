@@ -178,7 +178,7 @@ const SignInPage = () => {
       <div style={styles.container}>
         <div style={styles.formWrapper}>
           <div style={styles.header}>
-            <div style={styles.title}>WELCOME TO SHOPMART</div>
+            <div style={styles.title}>WELCOME TO SHOPPII</div>
             <p style={styles.subtitle}>Login here...</p>
           </div>
 

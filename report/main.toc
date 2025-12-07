@@ -1,0 +1,277 @@
+\babel@toc {vietnamese}{}\relax 
+\contentsline {chapter}{Table of Contents}{1}{chapter*.1}%
+\contentsline {chapter}{List of Figures}{5}{chapter*.2}%
+\contentsline {chapter}{List of Tables}{6}{chapter*.3}%
+\contentsline {section}{\numberline {1}Introduction}{7}{section.0.1}%
+\contentsline {section}{\numberline {2}Application Description}{7}{section.0.2}%
+\contentsline {subsection}{\numberline {2.1}Research related applications/systems}{7}{subsection.0.2.1}%
+\contentsline {subsection}{\numberline {2.2}Description of the Proposed System}{8}{subsection.0.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}General Description}{8}{subsubsection.0.2.2.1}%
+\contentsline {paragraph}{Types of Users:}{9}{section*.6}%
+\contentsline {paragraph}{Main System Functions:}{9}{section*.7}%
+\contentsline {subsubsection}{\numberline {2.2.2}Detailed Description of Entity Types, Attributes and Relationships}{9}{subsubsection.0.2.2.2}%
+\contentsline {paragraph}{ACCOUNT Entity}{9}{section*.8}%
+\contentsline {paragraph}{CUSTOMER Entity}{9}{section*.9}%
+\contentsline {paragraph}{SHOP Entity}{9}{section*.10}%
+\contentsline {paragraph}{ADMIN Entity}{10}{section*.11}%
+\contentsline {paragraph}{CATEGORY Entity}{10}{section*.12}%
+\contentsline {paragraph}{PRODUCT Entity}{10}{section*.13}%
+\contentsline {paragraph}{PRODUCTITEM Entity}{10}{section*.14}%
+\contentsline {paragraph}{CART Entity}{10}{section*.15}%
+\contentsline {paragraph}{CARTITEM Entity}{10}{section*.16}%
+\contentsline {paragraph}{ORDER Entity}{10}{section*.17}%
+\contentsline {paragraph}{ORDERITEM Entity}{11}{section*.18}%
+\contentsline {paragraph}{VOUCHER Entity}{11}{section*.19}%
+\contentsline {paragraph}{SHIPPING Entity}{11}{section*.20}%
+\contentsline {paragraph}{REVIEW Entity}{11}{section*.21}%
+\contentsline {section}{\numberline {3}Description of Semantic Constraints}{12}{section.0.3}%
+\contentsline {subsection}{\numberline {3.1}ACCOUNT}{12}{subsection.0.3.1}%
+\contentsline {subsection}{\numberline {3.2}CUSTOMER}{12}{subsection.0.3.2}%
+\contentsline {subsection}{\numberline {3.3}SHOP}{12}{subsection.0.3.3}%
+\contentsline {subsection}{\numberline {3.4}ADMIN}{12}{subsection.0.3.4}%
+\contentsline {subsection}{\numberline {3.5}CATEGORY}{12}{subsection.0.3.5}%
+\contentsline {subsection}{\numberline {3.6}PRODUCT}{12}{subsection.0.3.6}%
+\contentsline {subsection}{\numberline {3.7}PRODUCTITEM}{13}{subsection.0.3.7}%
+\contentsline {subsection}{\numberline {3.8}CART}{13}{subsection.0.3.8}%
+\contentsline {subsection}{\numberline {3.9}ORDER}{13}{subsection.0.3.9}%
+\contentsline {subsection}{\numberline {3.10}ORDERITEM}{13}{subsection.0.3.10}%
+\contentsline {subsection}{\numberline {3.11}VOUCHER}{13}{subsection.0.3.11}%
+\contentsline {subsection}{\numberline {3.12}SHIPPING}{13}{subsection.0.3.12}%
+\contentsline {subsection}{\numberline {3.13}REVIEW}{13}{subsection.0.3.13}%
+\contentsline {section}{\numberline {4}Entity Relationship Diagram (ERD)}{14}{section.0.4}%
+\contentsline {section}{\numberline {5}Relational Database Schema}{14}{section.0.5}%
+\contentsline {subsection}{\numberline {5.1}Mapping Diagram}{14}{subsection.0.5.1}%
+\contentsline {subsection}{\numberline {5.2}Relational Database Schema Description}{15}{subsection.0.5.2}%
+\contentsline {section}{\numberline {6}Selected Technology}{17}{section.0.6}%
+\contentsline {subsection}{\numberline {6.1}Technology Stack}{17}{subsection.0.6.1}%
+\contentsline {subsubsection}{\numberline {6.1.1}Database Management System}{17}{subsubsection.0.6.1.1}%
+\contentsline {subsubsection}{\numberline {6.1.2}Backend Framework}{17}{subsubsection.0.6.1.2}%
+\contentsline {subsubsection}{\numberline {6.1.3}Frontend Framework}{17}{subsubsection.0.6.1.3}%
+\contentsline {subsubsection}{\numberline {6.1.4}Authentication}{18}{subsubsection.0.6.1.4}%
+\contentsline {section}{\numberline {7}Database Implementation}{18}{section.0.7}%
+\contentsline {subsection}{\numberline {7.1}Account Management}{18}{subsection.0.7.1}%
+\contentsline {subsubsection}{\numberline {7.1.1}ACCOUNT Table}{18}{subsubsection.0.7.1.1}%
+\contentsline {paragraph}{General Description:}{18}{section*.24}%
+\contentsline {subsubsection}{\numberline {7.1.2}CUSTOMER Table}{18}{subsubsection.0.7.1.2}%
+\contentsline {paragraph}{General Description:}{19}{section*.25}%
+\contentsline {subsubsection}{\numberline {7.1.3}SHOP Table}{19}{subsubsection.0.7.1.3}%
+\contentsline {paragraph}{General Description:}{19}{section*.26}%
+\contentsline {subsubsection}{\numberline {7.1.4}ADMIN Table}{19}{subsubsection.0.7.1.4}%
+\contentsline {paragraph}{General Description:}{20}{section*.27}%
+\contentsline {subsection}{\numberline {7.2}Product Catalog}{20}{subsection.0.7.2}%
+\contentsline {subsubsection}{\numberline {7.2.1}CATEGORY Table}{20}{subsubsection.0.7.2.1}%
+\contentsline {paragraph}{General Description:}{20}{section*.28}%
+\contentsline {subsubsection}{\numberline {7.2.2}PRODUCT Table}{20}{subsubsection.0.7.2.2}%
+\contentsline {paragraph}{General Description:}{21}{section*.29}%
+\contentsline {subsubsection}{\numberline {7.2.3}PRODUCTITEM Table}{21}{subsubsection.0.7.2.3}%
+\contentsline {paragraph}{General Description:}{21}{section*.30}%
+\contentsline {subsection}{\numberline {7.3}Shopping Cart}{21}{subsection.0.7.3}%
+\contentsline {subsubsection}{\numberline {7.3.1}CART Table}{21}{subsubsection.0.7.3.1}%
+\contentsline {paragraph}{General Description:}{22}{section*.31}%
+\contentsline {subsubsection}{\numberline {7.3.2}CARTITEM Table}{22}{subsubsection.0.7.3.2}%
+\contentsline {paragraph}{General Description:}{22}{section*.32}%
+\contentsline {subsection}{\numberline {7.4}Orders and Items}{22}{subsection.0.7.4}%
+\contentsline {subsubsection}{\numberline {7.4.1}ORDER Table}{22}{subsubsection.0.7.4.1}%
+\contentsline {paragraph}{General Description:}{23}{section*.33}%
+\contentsline {subsubsection}{\numberline {7.4.2}ORDERITEM Table}{23}{subsubsection.0.7.4.2}%
+\contentsline {paragraph}{General Description:}{23}{section*.34}%
+\contentsline {subsection}{\numberline {7.5}Promotions}{23}{subsection.0.7.5}%
+\contentsline {subsubsection}{\numberline {7.5.1}VOUCHER Table}{23}{subsubsection.0.7.5.1}%
+\contentsline {paragraph}{General Description:}{24}{section*.35}%
+\contentsline {subsection}{\numberline {7.6}Shipping}{24}{subsection.0.7.6}%
+\contentsline {subsubsection}{\numberline {7.6.1}SHIPPING Table}{24}{subsubsection.0.7.6.1}%
+\contentsline {paragraph}{General Description:}{24}{section*.36}%
+\contentsline {subsection}{\numberline {7.7}Reviews and Feedback}{24}{subsection.0.7.7}%
+\contentsline {subsubsection}{\numberline {7.7.1}REVIEW Table}{24}{subsubsection.0.7.7.1}%
+\contentsline {section}{\numberline {8}Sample Data Insertion}{25}{section.0.8}%
+\contentsline {subsection}{\numberline {8.1}Account Data}{25}{subsection.0.8.1}%
+\contentsline {subsection}{\numberline {8.2}Customer Data}{25}{subsection.0.8.2}%
+\contentsline {subsection}{\numberline {8.3}Shop Data}{26}{subsection.0.8.3}%
+\contentsline {subsection}{\numberline {8.4}Category Data}{26}{subsection.0.8.4}%
+\contentsline {subsection}{\numberline {8.5}Product and ProductItem Data}{27}{subsection.0.8.5}%
+\contentsline {subsection}{\numberline {8.6}Shipping and Voucher Data}{28}{subsection.0.8.6}%
+\contentsline {subsection}{\numberline {8.7}Order Transaction Data}{29}{subsection.0.8.7}%
+\contentsline {subsection}{\numberline {8.8}Review Data}{30}{subsection.0.8.8}%
+\contentsline {section}{\numberline {9}Functions and Procedures}{31}{section.0.9}%
+\contentsline {subsection}{\numberline {9.1}Account Management Functions}{31}{subsection.0.9.1}%
+\contentsline {subsubsection}{\numberline {9.1.1}Function: Calculate Customer Total Spent}{31}{subsubsection.0.9.1.1}%
+\contentsline {paragraph}{Purpose:}{31}{section*.37}%
+\contentsline {paragraph}{Related Tables:}{31}{section*.38}%
+\contentsline {paragraph}{Explanation:}{31}{section*.39}%
+\contentsline {paragraph}{Example Usage:}{32}{lstlisting.0.-1}%
+\contentsline {subsection}{\numberline {9.2}Shop Management Functions}{32}{subsection.0.9.2}%
+\contentsline {subsubsection}{\numberline {9.2.1}Function: Calculate Shop Revenue}{32}{subsubsection.0.9.2.1}%
+\contentsline {paragraph}{Purpose:}{32}{section*.41}%
+\contentsline {paragraph}{Related Tables:}{33}{section*.42}%
+\contentsline {paragraph}{Explanation:}{33}{section*.43}%
+\contentsline {paragraph}{Example Usage:}{33}{lstlisting.0.-2}%
+\contentsline {subsubsection}{\numberline {9.2.2}Function: Calculate Shop Rating}{34}{subsubsection.0.9.2.2}%
+\contentsline {paragraph}{Purpose:}{34}{section*.45}%
+\contentsline {paragraph}{Related Tables:}{34}{section*.46}%
+\contentsline {paragraph}{Explanation:}{34}{section*.47}%
+\contentsline {paragraph}{Example Usage:}{34}{lstlisting.0.-3}%
+\contentsline {subsection}{\numberline {9.3}Product Management Functions}{35}{subsection.0.9.3}%
+\contentsline {subsubsection}{\numberline {9.3.1}Function: Calculate Product Rating}{35}{subsubsection.0.9.3.1}%
+\contentsline {paragraph}{Purpose:}{35}{section*.49}%
+\contentsline {paragraph}{Related Tables:}{35}{section*.50}%
+\contentsline {paragraph}{Explanation:}{35}{section*.51}%
+\contentsline {paragraph}{Example Usage:}{36}{lstlisting.0.-4}%
+\contentsline {subsubsection}{\numberline {9.3.2}Function: Calculate Order Total}{36}{subsubsection.0.9.3.2}%
+\contentsline {paragraph}{Purpose:}{36}{section*.53}%
+\contentsline {paragraph}{Related Tables:}{37}{section*.54}%
+\contentsline {paragraph}{Explanation:}{37}{section*.55}%
+\contentsline {paragraph}{Example Usage:}{38}{lstlisting.0.-5}%
+\contentsline {subsubsection}{\numberline {9.3.3}Function: Get Order Total Items with Cursor}{38}{subsubsection.0.9.3.3}%
+\contentsline {paragraph}{Purpose:}{38}{section*.57}%
+\contentsline {paragraph}{Related Tables:}{39}{section*.58}%
+\contentsline {paragraph}{Explanation:}{39}{section*.59}%
+\contentsline {paragraph}{Example Usage:}{39}{lstlisting.0.-6}%
+\contentsline {subsection}{\numberline {9.4}Category Hierarchy Procedures}{40}{subsection.0.9.4}%
+\contentsline {subsubsection}{\numberline {9.4.1}Procedure: Get Category Hierarchy (All Levels)}{40}{subsubsection.0.9.4.1}%
+\contentsline {paragraph}{Purpose:}{40}{section*.61}%
+\contentsline {paragraph}{Related Tables:}{41}{section*.62}%
+\contentsline {paragraph}{Explanation:}{41}{section*.63}%
+\contentsline {paragraph}{Example Usage:}{41}{lstlisting.0.-7}%
+\contentsline {subsubsection}{\numberline {9.4.2}Procedure: Get All Children of a Category}{41}{subsubsection.0.9.4.2}%
+\contentsline {paragraph}{Purpose:}{41}{section*.65}%
+\contentsline {paragraph}{Related Tables:}{42}{section*.66}%
+\contentsline {paragraph}{Explanation:}{42}{section*.67}%
+\contentsline {paragraph}{Example Usage:}{42}{lstlisting.0.-8}%
+\contentsline {subsubsection}{\numberline {9.4.3}Procedure: Get All Parents of a Category}{43}{subsubsection.0.9.4.3}%
+\contentsline {paragraph}{Purpose:}{43}{section*.69}%
+\contentsline {paragraph}{Related Tables:}{44}{section*.70}%
+\contentsline {paragraph}{Explanation:}{44}{section*.71}%
+\contentsline {paragraph}{Example Usage:}{44}{lstlisting.0.-9}%
+\contentsline {subsection}{\numberline {9.5}Order Management Procedures}{44}{subsection.0.9.5}%
+\contentsline {subsubsection}{\numberline {9.5.1}Procedure: Create Order from Cart}{44}{subsubsection.0.9.5.1}%
+\contentsline {paragraph}{Purpose:}{44}{section*.73}%
+\contentsline {paragraph}{Related Tables:}{47}{section*.74}%
+\contentsline {paragraph}{Explanation:}{47}{section*.75}%
+\contentsline {paragraph}{Example Usage:}{48}{lstlisting.0.-10}%
+\contentsline {subsubsection}{\numberline {9.5.2}Procedure: Apply Voucher}{49}{subsubsection.0.9.5.2}%
+\contentsline {paragraph}{Purpose:}{49}{section*.77}%
+\contentsline {paragraph}{Related Tables:}{50}{section*.78}%
+\contentsline {paragraph}{Explanation:}{50}{section*.79}%
+\contentsline {paragraph}{Example Usage:}{50}{lstlisting.0.-11}%
+\contentsline {subsection}{\numberline {9.6}Shop Management Procedures}{51}{subsection.0.9.6}%
+\contentsline {subsubsection}{\numberline {9.6.1}Procedure: Get Shop Revenue Report}{51}{subsubsection.0.9.6.1}%
+\contentsline {paragraph}{Purpose:}{51}{section*.81}%
+\contentsline {paragraph}{Related Tables:}{52}{section*.82}%
+\contentsline {paragraph}{Explanation:}{52}{section*.83}%
+\contentsline {paragraph}{Result Set 1 - Shop Summary:}{52}{section*.84}%
+\contentsline {paragraph}{Result Set 2 - Top 10 Products:}{52}{section*.85}%
+\contentsline {paragraph}{Example Usage:}{53}{lstlisting.0.-12}%
+\contentsline {subsection}{\numberline {9.7}Product CRUD Procedures}{53}{subsection.0.9.7}%
+\contentsline {subsubsection}{\numberline {9.7.1}Procedure: Add Product}{53}{subsubsection.0.9.7.1}%
+\contentsline {paragraph}{Purpose:}{53}{section*.87}%
+\contentsline {paragraph}{Related Tables:}{54}{section*.88}%
+\contentsline {paragraph}{Explanation:}{54}{section*.89}%
+\contentsline {paragraph}{Example Usage:}{54}{lstlisting.0.-13}%
+\contentsline {subsubsection}{\numberline {9.7.2}Procedure: Update Product}{55}{subsubsection.0.9.7.2}%
+\contentsline {paragraph}{Purpose:}{55}{section*.91}%
+\contentsline {paragraph}{Related Tables:}{56}{section*.92}%
+\contentsline {paragraph}{Explanation:}{56}{section*.93}%
+\contentsline {paragraph}{Example Usage:}{56}{lstlisting.0.-14}%
+\contentsline {subsubsection}{\numberline {9.7.3}Procedure: Delete Product}{57}{subsubsection.0.9.7.3}%
+\contentsline {paragraph}{Purpose:}{57}{section*.95}%
+\contentsline {paragraph}{Related Tables:}{57}{section*.96}%
+\contentsline {paragraph}{Explanation:}{57}{section*.97}%
+\contentsline {paragraph}{Example Usage:}{58}{lstlisting.0.-15}%
+\contentsline {subsubsection}{\numberline {9.7.4}Procedure: Add Product Item (Variant)}{58}{subsubsection.0.9.7.4}%
+\contentsline {paragraph}{Purpose:}{58}{section*.99}%
+\contentsline {paragraph}{Related Tables:}{59}{section*.100}%
+\contentsline {paragraph}{Explanation:}{59}{section*.101}%
+\contentsline {paragraph}{Example Usage:}{59}{lstlisting.0.-16}%
+\contentsline {subsubsection}{\numberline {9.7.5}Procedure: Update Product Item}{60}{subsubsection.0.9.7.5}%
+\contentsline {paragraph}{Purpose:}{60}{section*.103}%
+\contentsline {paragraph}{Related Tables:}{61}{section*.104}%
+\contentsline {paragraph}{Explanation:}{61}{section*.105}%
+\contentsline {paragraph}{Example Usage:}{61}{lstlisting.0.-17}%
+\contentsline {subsubsection}{\numberline {9.7.6}Procedure: Delete Product Item}{61}{subsubsection.0.9.7.6}%
+\contentsline {paragraph}{Purpose:}{61}{section*.107}%
+\contentsline {paragraph}{Related Tables:}{62}{section*.108}%
+\contentsline {paragraph}{Explanation:}{62}{section*.109}%
+\contentsline {paragraph}{Example Usage:}{62}{lstlisting.0.-18}%
+\contentsline {subsection}{\numberline {9.8}Product Search Procedure}{62}{subsection.0.9.8}%
+\contentsline {subsubsection}{\numberline {9.8.1}Procedure: Get Product List with Filters}{62}{subsubsection.0.9.8.1}%
+\contentsline {paragraph}{Purpose:}{62}{section*.111}%
+\contentsline {paragraph}{Related Tables:}{65}{section*.112}%
+\contentsline {paragraph}{Explanation:}{65}{section*.113}%
+\contentsline {paragraph}{Example Usage:}{65}{lstlisting.0.-19}%
+\contentsline {section}{\numberline {10}Database Triggers}{65}{section.0.10}%
+\contentsline {subsection}{\numberline {10.1}Order Management Triggers}{66}{subsection.0.10.1}%
+\contentsline {subsubsection}{\numberline {10.1.1}Trigger: Order Item Before Insert}{66}{subsubsection.0.10.1.1}%
+\contentsline {paragraph}{Purpose:}{66}{section*.115}%
+\contentsline {paragraph}{Trigger Type:}{66}{section*.116}%
+\contentsline {paragraph}{Related Tables:}{66}{section*.117}%
+\contentsline {paragraph}{Business Logic:}{67}{section*.118}%
+\contentsline {paragraph}{Example Scenario:}{67}{lstlisting.0.-20}%
+\contentsline {subsubsection}{\numberline {10.1.2}Trigger: Order Item After Insert}{67}{subsubsection.0.10.1.2}%
+\contentsline {paragraph}{Purpose:}{67}{section*.120}%
+\contentsline {paragraph}{Trigger Type:}{68}{section*.121}%
+\contentsline {paragraph}{Related Tables:}{68}{section*.122}%
+\contentsline {paragraph}{Business Logic:}{68}{section*.123}%
+\contentsline {paragraph}{Example Scenario:}{68}{lstlisting.0.-21}%
+\contentsline {subsubsection}{\numberline {10.1.3}Trigger: Order After Update (Stock Restoration)}{69}{subsubsection.0.10.1.3}%
+\contentsline {paragraph}{Purpose:}{69}{section*.125}%
+\contentsline {paragraph}{Trigger Type:}{70}{section*.126}%
+\contentsline {paragraph}{Related Tables:}{70}{section*.127}%
+\contentsline {paragraph}{Business Logic:}{70}{section*.128}%
+\contentsline {paragraph}{Example Scenario:}{70}{lstlisting.0.-22}%
+\contentsline {subsection}{\numberline {10.2}Review Management Triggers}{71}{subsection.0.10.2}%
+\contentsline {subsubsection}{\numberline {10.2.1}Trigger: Review Before Insert (Verified Purchase)}{71}{subsubsection.0.10.2.1}%
+\contentsline {paragraph}{Purpose:}{71}{section*.130}%
+\contentsline {paragraph}{Trigger Type:}{72}{section*.131}%
+\contentsline {paragraph}{Related Tables:}{72}{section*.132}%
+\contentsline {paragraph}{Business Logic:}{72}{section*.133}%
+\contentsline {paragraph}{Example Scenario:}{72}{lstlisting.0.-23}%
+\contentsline {subsubsection}{\numberline {10.2.2}Trigger: Review After Insert (Rating Update)}{72}{subsubsection.0.10.2.2}%
+\contentsline {paragraph}{Purpose:}{72}{section*.135}%
+\contentsline {paragraph}{Trigger Type:}{73}{section*.136}%
+\contentsline {paragraph}{Related Tables:}{73}{section*.137}%
+\contentsline {paragraph}{Business Logic:}{73}{section*.138}%
+\contentsline {paragraph}{Example Scenario:}{73}{lstlisting.0.-24}%
+\contentsline {subsection}{\numberline {10.3}Inventory Management Triggers}{74}{subsection.0.10.3}%
+\contentsline {subsubsection}{\numberline {10.3.1}Trigger: Product Item Before Update}{74}{subsubsection.0.10.3.1}%
+\contentsline {paragraph}{Purpose:}{74}{section*.140}%
+\contentsline {paragraph}{Trigger Type:}{74}{section*.141}%
+\contentsline {paragraph}{Related Tables:}{74}{section*.142}%
+\contentsline {paragraph}{Business Logic:}{74}{section*.143}%
+\contentsline {paragraph}{Example Scenario:}{74}{lstlisting.0.-25}%
+\contentsline {subsection}{\numberline {10.4}Account Management Triggers}{75}{subsection.0.10.4}%
+\contentsline {subsubsection}{\numberline {10.4.1}Trigger: Account After Insert (Subclass Creation)}{75}{subsubsection.0.10.4.1}%
+\contentsline {paragraph}{Purpose:}{75}{section*.145}%
+\contentsline {paragraph}{Trigger Type:}{75}{section*.146}%
+\contentsline {paragraph}{Related Tables:}{75}{section*.147}%
+\contentsline {paragraph}{Business Logic:}{75}{section*.148}%
+\contentsline {paragraph}{Example Scenario:}{76}{lstlisting.0.-26}%
+\contentsline {subsubsection}{\numberline {10.4.2}Trigger: Customer Before Insert (Code Generation)}{76}{subsubsection.0.10.4.2}%
+\contentsline {paragraph}{Purpose:}{76}{section*.150}%
+\contentsline {paragraph}{Trigger Type:}{76}{section*.151}%
+\contentsline {paragraph}{Related Tables:}{76}{section*.152}%
+\contentsline {paragraph}{Business Logic:}{77}{section*.153}%
+\contentsline {paragraph}{Example Scenario:}{77}{lstlisting.0.-27}%
+\contentsline {subsubsection}{\numberline {10.4.3}Trigger: Shop Before Insert (Code Generation)}{77}{subsubsection.0.10.4.3}%
+\contentsline {paragraph}{Purpose:}{77}{section*.155}%
+\contentsline {paragraph}{Trigger Type:}{77}{section*.156}%
+\contentsline {paragraph}{Related Tables:}{77}{section*.157}%
+\contentsline {paragraph}{Business Logic:}{78}{section*.158}%
+\contentsline {paragraph}{Example Scenario:}{78}{lstlisting.0.-28}%
+\contentsline {section}{\numberline {11}Application Demo and System Workflow}{78}{section.0.11}%
+\contentsline {subsection}{\numberline {11.1}System Architecture Overview}{78}{subsection.0.11.1}%
+\contentsline {subsubsection}{\numberline {11.1.1}Three-Tier Architecture Design}{78}{subsubsection.0.11.1.1}%
+\contentsline {paragraph}{1. Data Layer (MySQL Database):}{78}{section*.160}%
+\contentsline {paragraph}{2. Application Layer (Node.js + Express):}{79}{section*.161}%
+\contentsline {paragraph}{3. Presentation Layer (React + Redux):}{79}{section*.162}%
+\contentsline {subsection}{\numberline {11.2}Main Features Demonstration}{80}{subsection.0.11.2}%
+\contentsline {subsubsection}{\numberline {11.2.1}Feature 1: Product Search and Discovery}{80}{subsubsection.0.11.2.1}%
+\contentsline {subsubsection}{\numberline {11.2.2}Feature 2: Shopping Cart Management}{80}{subsubsection.0.11.2.2}%
+\contentsline {subsubsection}{\numberline {11.2.3}Feature 3: Order Creation with Voucher}{81}{subsubsection.0.11.2.3}%
+\contentsline {subsubsection}{\numberline {11.2.4}Feature 4: Product Review and Rating}{82}{subsubsection.0.11.2.4}%
+\contentsline {subsubsection}{\numberline {11.2.5}Feature 5: Shop Revenue Analytics}{83}{subsubsection.0.11.2.5}%
+\contentsline {section}{\numberline {12}References and Video Demonstration}{83}{section.0.12}%
+\contentsline {subsection}{\numberline {12.1}GitHub Repository}{83}{subsection.0.12.1}%
+\contentsline {subsection}{\numberline {12.2}Video Demonstration}{83}{subsection.0.12.2}%
+\contentsline {section}{\numberline {13}Conclusion}{83}{section.0.13}%
+\contentsline {subsection}{\numberline {13.1}Summary}{84}{subsection.0.13.1}%
+\contentsline {subsection}{\numberline {13.2}Key Features}{84}{subsection.0.13.2}%

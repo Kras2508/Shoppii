@@ -135,7 +135,7 @@ const ShopHeader = () => {
         <div style={styles.logoSection}>
           <Link to="/shop" style={styles.logo}>
             <span>🏪</span>
-            <span>ShopMart</span>
+            <span>Shoppii</span>
           </Link>
         </div>
 

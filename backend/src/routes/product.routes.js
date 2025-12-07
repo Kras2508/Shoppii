@@ -12,7 +12,6 @@ import {
   upsertVariant,
   deleteVariant,
   getShopProducts,
-  getProductStatistics
 } from '../controllers/product.controller.js';
 import { verifyToken, isShop } from '../middlewares/auth.middleware.js';
 
@@ -52,7 +51,6 @@ const router = Router();
 
 // Public routes
 router.get('/', getProducts);
-router.get('/statistics', getProductStatistics); // Uses sp_get_product_statistics
 router.get('/:id', getProductById);
 
 // Upload route

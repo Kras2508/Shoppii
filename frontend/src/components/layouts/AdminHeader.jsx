@@ -120,7 +120,7 @@ const AdminHeader = () => {
         <div style={styles.logoSection}>
           <Link to="/admin" style={styles.logo}>
             <span>🛡️</span>
-            <span>ShopMart</span>
+            <span>Shoppii</span>
           </Link>
         </div>
 

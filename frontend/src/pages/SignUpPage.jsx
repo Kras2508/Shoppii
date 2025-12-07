@@ -209,7 +209,7 @@ const SignUpPage = () => {
       <div style={styles.container}>
         <div style={styles.formWrapper}>
           <div style={styles.header}>
-            <h1 style={styles.title}>WELCOME TO SHOPMART</h1>
+            <h1 style={styles.title}>WELCOME TO SHOPPII</h1>
             <p style={styles.subtitle}>Haven't got an account?</p>
           </div>
 

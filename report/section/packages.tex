@@ -1,0 +1,135 @@
+\usepackage {amsmath, amssymb, amsthm}
+\usepackage{microtype}
+\usepackage[a4paper, total={17cm, 24cm}]{geometry}
+\usepackage[svgnames]{xcolor} 
+\usepackage{lmodern}
+\usepackage{sectsty}
+\usepackage{indentfirst}
+\usepackage{centernot}
+\usepackage{framed}
+\usepackage{lipsum}
+\usepackage[skins,theorems]{tcolorbox}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{subcaption}
+\usepackage{tocbibind}
+\usepackage{graphicx}
+\usepackage{lastpage}
+\usepackage{fancyhdr}
+\setlength{\headheight}{26pt}
+\addtolength{\topmargin}{-14pt}
+\usepackage{tikz}
+\usepackage[T1]{fontenc} 
+\usepackage{etoolbox}
+\usepackage{hyperref}
+\usepackage[utf8]{inputenc}
+\usepackage[english, vietnamese]{babel}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{colortbl}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{rotating}
+
+\addto\captionsvietnamese{%
+  \renewcommand{\tablename}{Table}%
+  \renewcommand{\figurename}{Figure}%
+}
+
+\hypersetup{
+  colorlinks   = true,    % Colours links instead of ugly boxes
+  urlcolor     = blue,    % Colour for external hyperlinks
+  linkcolor    = black,    % Colour of internal links
+  citecolor    = FireBrick     % Colour of citations
+}
+
+% Set numbering depth for sections (show numbers up to subsubsection)
+\setcounter{secnumdepth}{3}  % 0=chapter, 1=section, 2=subsection, 3=subsubsection
+\setcounter{tocdepth}{3}     % Show in table of contents up to subsubsection
+
+\makeatletter
+
+\pretocmd{\NAT@citex}{%
+  \let\NAT@hyper@\NAT@hyper@citex
+  \def\NAT@postnote{#2}%
+  \setcounter{NAT@total@cites}{0}%
+  \setcounter{NAT@count@cites}{0}%
+  \forcsvlist{\stepcounter{NAT@total@cites}\@gobble}{#3}}{}{}
+\newcounter{NAT@total@cites}
+\newcounter{NAT@count@cites}
+\def\NAT@postnote{}
+
+% include postnote and \citet closing bracket in hyperlink
+\def\NAT@hyper@citex#1{%
+  \stepcounter{NAT@count@cites}%
+  \hyper@natlinkstart{\@citeb\@extra@b@citeb}#1%
+  \ifnumequal{\value{NAT@count@cites}}{\value{NAT@total@cites}}
+    {\ifNAT@swa\else\if*\NAT@postnote*\else%
+     \NAT@cmt\NAT@postnote\global\def\NAT@postnote{}\fi\fi}{}%
+  \ifNAT@swa\else\if\relax\NAT@date\relax
+  \else\NAT@@close\global\let\NAT@nm\@empty\fi\fi% avoid compact citations
+  \hyper@natlinkend}
+\renewcommand\hyper@natlinkbreak[2]{#1}
+
+% avoid extraneous postnotes, closing brackets
+\patchcmd{\NAT@citex}
+  {\ifNAT@swa\else\if*#2*\else\NAT@cmt#2\fi
+   \if\relax\NAT@date\relax\else\NAT@@close\fi\fi}{}{}{}
+\patchcmd{\NAT@citex}
+  {\if\relax\NAT@date\relax\NAT@def@citea\else\NAT@def@citea@close\fi}
+  {\if\relax\NAT@date\relax\NAT@def@citea\else\NAT@def@citea@space\fi}{}{}
+
+\makeatother
+
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand\bfdefault{b}
+\renewcommand\qedsymbol{$\blacksquare$}
+%\renewcommand{\thesection}{\Alph{section}}
+\renewcommand\thesection{\arabic{section}}
+\setlength{\parindent}{6pt}
+\setlength{\parskip}{3pt}
+
+\newcommand{\bd}{\textbf}
+\newcommand{\bdv}[1]{\textcolor{violet}{\textbf{#1}}}
+\newcommand{\divby}{\scalebox{0.75}{\textbf{\vdots}}}
+
+\newcommand{\Lrar}{\Rightarrow}
+\newcommand{\Llrar}{\Leftrightarrow}
+
+\newcommand{\limatob}[2]{\displaystyle\lim_{#1 \to #2}}
+\newcommand{\sumatob}[3]{\sum_{#1 = #2}^{#3}}
+\newcommand{\prodatob}[3]{\prod_{#1 = #2}^{#3}}
+ 
+\newcommand{\ngt}[1]{\left( #1 \right)} 
+\newcommand{\ngv}[1]{\left[ #1 \right]}
+\newcommand{\ngn}[1]{\left\{ #1 \right\}}
+\newcommand{\abs}[1]{\lvert #1 \rvert}
+\newcommand{\modn}[1]{\text{ (mod $#1$)}}
+\DeclareMathOperator{\orderof}{ord}
+\newcommand{\ord}[2]{\orderof_#1 \ngt{#2}}
+
+\lstset{frame=tb,
+  numbers=left,
+  stepnumber=1,
+  language=Python,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numberstyle=\tiny\color{DimGray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{DarkGreen},
+  stringstyle=\color{FireBrick},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3
+}
+
+\graphicspath{{img/}}
+\pagestyle{fancy}

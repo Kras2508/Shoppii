@@ -197,7 +197,7 @@ const Header = () => {
           <Link to="/" style={styles.logo}>
             <div style={styles.logoText}>
               <span style={{ fontSize: '32px' }}>🛒</span>
-              <span>ShopMart</span>
+              <span>Shoppii</span>
             </div>
           </Link>
 

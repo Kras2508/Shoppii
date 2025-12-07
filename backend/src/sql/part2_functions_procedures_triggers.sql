@@ -390,8 +390,110 @@ DELIMITER ;
 -- Drop procedures if they exist
 DROP PROCEDURE IF EXISTS sp_get_shop_revenue_report;
 DROP PROCEDURE IF EXISTS sp_create_order_from_cart;
-DROP PROCEDURE IF EXISTS sp_get_product_statistics;
 DROP PROCEDURE IF EXISTS sp_apply_voucher;
+DROP PROCEDURE IF EXISTS sp_get_product_list;
+
+DELIMITER $$
+
+-- ---------------------------------------------
+-- PROCEDURE: Get Product List with Filters
+-- Lấy danh sách sản phẩm với filter, search, sort, pagination
+-- > 2 bảng: Product, Shop, Category, ProductItem, Review
+-- Aggregate: MIN, MAX, SUM, COUNT, AVG
+-- GROUP BY, HAVING, ORDER BY
+-- ---------------------------------------------
+CREATE PROCEDURE sp_get_product_list(
+    IN p_search VARCHAR(255),
+    IN p_category_id INT,
+    IN p_shop_id INT,
+    IN p_min_price DECIMAL(15,2),
+    IN p_max_price DECIMAL(15,2),
+    IN p_status VARCHAR(50),
+    IN p_sort_by VARCHAR(50),
+    IN p_sort_order VARCHAR(10),
+    IN p_page INT,
+    IN p_limit INT,
+    OUT p_total_count INT
+)
+BEGIN
+    DECLARE v_offset INT;
+    DECLARE v_order_clause VARCHAR(100);
+    
+    SET v_offset = (p_page - 1) * p_limit;
+    
+    -- Determine sort order
+    SET v_order_clause = CASE p_sort_by
+        WHEN 'price' THEN CONCAT('min_price ', COALESCE(p_sort_order, 'ASC'))
+        WHEN 'rating' THEN CONCAT('avg_rating ', COALESCE(p_sort_order, 'DESC'))
+        WHEN 'created_at' THEN CONCAT('p.created_at ', COALESCE(p_sort_order, 'DESC'))
+        ELSE 'p.created_at DESC'
+    END;
+    
+    -- Get total count first
+    SELECT COUNT(DISTINCT p.product_id) INTO p_total_count
+    FROM Product p
+    INNER JOIN Shop s ON p.shop_id = s.shop_id
+    INNER JOIN Category c ON p.category_id = c.category_id
+    LEFT JOIN ProductItem pi ON p.product_id = pi.product_id
+    WHERE 1=1
+        AND (p_search IS NULL OR p.product_name LIKE CONCAT('%', p_search, '%') OR p.description LIKE CONCAT('%', p_search, '%'))
+        AND (p_category_id IS NULL OR p.category_id = p_category_id)
+        AND (p_shop_id IS NULL OR p.shop_id = p_shop_id)
+        AND (p_status IS NULL OR p.status = p_status);
+    
+    -- Main query with filters and aggregations
+    SET @sql = CONCAT('
+        SELECT 
+            p.product_id,
+            p.product_name,
+            p.description,
+            p.image,
+            p.status,
+            p.created_at,
+            p.shop_id,
+            s.shop_name,
+            s.rating as shop_rating,
+            c.category_id,
+            c.category_name,
+            MIN(pi.price) as min_price,
+            MAX(pi.price) as max_price,
+            SUM(pi.stock) as total_stock,
+            COUNT(DISTINCT pi.item_id) as variant_count,
+            COALESCE((
+                SELECT AVG(r.rating)
+                FROM Review r
+                WHERE r.target_id = p.product_id AND r.target_type = "Product"
+            ), 0) as avg_rating,
+            COALESCE((
+                SELECT COUNT(*)
+                FROM Review r
+                WHERE r.target_id = p.product_id AND r.target_type = "Product"
+            ), 0) as review_count
+        FROM Product p
+        INNER JOIN Shop s ON p.shop_id = s.shop_id
+        INNER JOIN Category c ON p.category_id = c.category_id
+        LEFT JOIN ProductItem pi ON p.product_id = pi.product_id
+        WHERE 1=1',
+        CASE WHEN p_search IS NOT NULL THEN 
+            CONCAT(' AND (p.product_name LIKE "%', p_search, '%" OR p.description LIKE "%', p_search, '%")')
+        ELSE '' END,
+        CASE WHEN p_category_id IS NOT NULL THEN CONCAT(' AND p.category_id = ', p_category_id) ELSE '' END,
+        CASE WHEN p_shop_id IS NOT NULL THEN CONCAT(' AND p.shop_id = ', p_shop_id) ELSE '' END,
+        CASE WHEN p_status IS NOT NULL THEN CONCAT(' AND p.status = "', p_status, '"') ELSE '' END,
+        ' GROUP BY p.product_id, p.product_name, p.description, p.image, p.status, 
+                   p.created_at, p.shop_id, s.shop_name, s.rating, c.category_id, c.category_name',
+        CASE WHEN p_min_price IS NOT NULL THEN CONCAT(' HAVING min_price >= ', p_min_price) ELSE '' END,
+        CASE WHEN p_max_price IS NOT NULL THEN 
+            CONCAT(CASE WHEN p_min_price IS NOT NULL THEN ' AND' ELSE ' HAVING' END, ' max_price <= ', p_max_price)
+        ELSE '' END,
+        ' ORDER BY ', v_order_clause,
+        ' LIMIT ', p_limit, ' OFFSET ', v_offset
+    );
+    
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+END$$
 
 DELIMITER $$
 

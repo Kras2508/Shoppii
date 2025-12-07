@@ -1,0 +1,608 @@
+\newpage
+
+\section{Selected Technology}
+
+\subsection{Technology Stack}
+
+The proposed e-commerce platform utilizes a modern, scalable technology stack designed to support concurrent users, complex transactions, and real-time data synchronization:
+
+\subsubsection{Database Management System}
+
+\textbf{MySQL Server 8.0} is selected as the primary DBMS due to its:
+\begin{itemize}
+    \item \textbf{ACID Compliance}: Ensures data integrity across multi-seller transactions
+    \item \textbf{Foreign Key Constraints}: Enforces referential integrity across 14 entities
+    \item \textbf{Triggers and Stored Procedures}: Enables business logic automation (auto-generated codes, inventory management, rating calculations)
+    \item \textbf{Recursive Queries}: Supports hierarchical category traversal
+    \item \textbf{JSON Support}: Optional future extensibility for product metadata
+\end{itemize}
+
+\subsubsection{Backend Framework}
+
+\textbf{Node.js with Express.js} provides:
+\begin{itemize}
+    \item Event-driven, non-blocking I/O for handling multiple concurrent requests
+    \item RESTful API design for clean separation between frontend and backend
+    \item Middleware support for authentication, validation, and error handling
+    \item Connection pooling for efficient database access
+\end{itemize}
+
+\subsubsection{Frontend Framework}
+
+\textbf{React with Vite} offers:
+\begin{itemize}
+    \item Component-based architecture for reusable UI elements
+    \item State management via Redux for complex application state
+    \item Fast hot module replacement during development
+    \item Optimized production builds with tree-shaking
+\end{itemize}
+
+\subsubsection{Authentication}
+
+\textbf{JWT (JSON Web Tokens)} for stateless authentication:
+\begin{itemize}
+    \item Secure token-based sessions
+    \item Role-based access control (Customer, Shop, Admin)
+    \item Token expiration and refresh mechanisms
+\end{itemize}
+
+\section{Database Implementation}
+
+\subsection{Account Management}
+
+\subsubsection{ACCOUNT Table}
+
+The \textbf{ACCOUNT} table serves as the central authentication and identity store for all system users. It implements table-level inheritance, with specialized entities (CUSTOMER, SHOP, ADMIN) storing additional role-specific information.
+
+\begin{lstlisting}[language=SQL, caption=ACCOUNT Table Creation, label=lst:account]
+CREATE TABLE Account (
+    account_id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('Customer','Shop','Admin') NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NOT NULL CHECK (LENGTH(phone) = 10 AND phone REGEXP '^[0-9]{10}$'),
+    status ENUM('Active','Ban') DEFAULT 'Active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CK_AccountRole CHECK (role IN ('Customer','Shop','Admin'))
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The ACCOUNT table centralizes user authentication across all three user types. The \textbf{email} field is UNIQUE to prevent duplicate account registrations. The \textbf{phone} CHECK constraint enforces Vietnamese phone format validation at the database level. The \textbf{role} ENUM field determines user permissions (Customer can purchase, Shop can sell, Admin supervises). Status field enables account suspension without deletion.
+
+\subsubsection{CUSTOMER Table}
+
+\begin{lstlisting}[language=SQL, caption=CUSTOMER Table Creation, label=lst:customer]
+CREATE TABLE Customer (
+    customer_id INT PRIMARY KEY,
+    customer_code VARCHAR(20) UNIQUE,
+    address VARCHAR(255),
+    add_phone VARCHAR(20) CHECK (LENGTH(add_phone) = 10 AND add_phone REGEXP '^[0-9]{10}$'),
+    total_spent DECIMAL(15,2) DEFAULT 0,
+    total_order INT DEFAULT 0,
+    FOREIGN KEY (customer_id) REFERENCES Account(account_id) ON DELETE CASCADE
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The CUSTOMER table extends ACCOUNT with purchase-specific attributes. The \textbf{customer\_code} is auto-generated via trigger with 'CUST' prefix, enabling easy customer identification in reports. \textbf{Address} is mandatory for order fulfillment. \textbf{TotalSpent} and \textbf{TotalOrder} are derived attributes maintained by triggers on order completion, supporting customer loyalty analysis. The UNIQUE constraint on customer\_code and index on total\_spent enable efficient customer ranking and loyalty program implementation.
+
+\subsubsection{SHOP Table}
+
+\begin{lstlisting}[language=SQL, caption=SHOP Table Creation, label=lst:shop]
+CREATE TABLE Shop (
+    shop_id INT PRIMARY KEY,
+    shop_code VARCHAR(20) UNIQUE,
+    shop_name VARCHAR(255) NOT NULL,
+    shop_phone VARCHAR(20) CHECK (LENGTH(shop_phone) = 10 AND shop_phone REGEXP '^[0-9]{10}$'),
+    address_shop VARCHAR(255),
+    rating DECIMAL(3,2) DEFAULT 0 CHECK (rating BETWEEN 0 AND 5),
+    shop_status ENUM('Open','Temporarily Close','Closed') DEFAULT 'Open',
+    FOREIGN KEY (shop_id) REFERENCES Account(account_id) ON DELETE CASCADE
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The SHOP table models seller entities with business-specific attributes. \textbf{shop\_code} is auto-generated with 'SHOP' prefix for seller identification. \textbf{shop\_status} controls whether a seller can list products (Open) or is inactive. \textbf{rating} is auto-calculated from customer reviews via trigger, providing trust metrics. Indexes on shop\_code and rating enable efficient shop searching and ranking by customer ratings.
+
+\subsubsection{ADMIN Table}
+
+\begin{lstlisting}[language=SQL, caption=ADMIN Table Creation, label=lst:admin]
+CREATE TABLE Admin (
+    admin_id INT PRIMARY KEY,
+    role ENUM('Core','Moderator','Support') NOT NULL,
+    note TEXT,
+    FOREIGN KEY (admin_id) REFERENCES Account(account_id) ON DELETE CASCADE
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The ADMIN table represents platform supervisors with three access levels. \textbf{Core} admins have full system access, \textbf{Moderator} admins handle dispute resolution and content moderation, while \textbf{Support} admins assist customers. The note field allows tracking of admin activities and responsibilities. Unlike CUSTOMER and SHOP, ADMIN entities do not engage in transactions.
+
+\subsection{Product Catalog}
+
+\subsubsection{CATEGORY Table}
+
+\begin{lstlisting}[language=SQL, caption=CATEGORY Table Creation, label=lst:category]
+CREATE TABLE Category (
+    category_id INT AUTO_INCREMENT PRIMARY KEY,
+    category_name VARCHAR(100) NOT NULL,
+    parent_category_id INT,
+    FOREIGN KEY (parent_category_id) REFERENCES Category(category_id) ON DELETE SET NULL
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The CATEGORY table implements a self-referential recursive relationship enabling hierarchical product organization (e.g., Electronics $\rightarrow$ Phones $\rightarrow$ Smartphones). The \textbf{parent\_category\_id} can be NULL for root-level categories. The recursive FK with ON DELETE SET NULL ensures child categories remain accessible if a parent is deleted..
+
+\subsubsection{PRODUCT Table}
+
+\begin{lstlisting}[language=SQL, caption=PRODUCT Table Creation, label=lst:product]
+CREATE TABLE Product (
+    product_id INT AUTO_INCREMENT PRIMARY KEY,
+    shop_id INT NOT NULL,
+    category_id INT NOT NULL,
+    product_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    image VARCHAR(255),
+    rating DECIMAL(3,2) DEFAULT 0,
+    status ENUM('In stock','Out of stock') DEFAULT 'In stock',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (shop_id) REFERENCES Shop(shop_id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES Category(category_id)
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The PRODUCT table represents individual product listings managed by shops. Each product belongs to exactly one SHOP (N:1 relationship with ON DELETE CASCADE to remove products when shop is deleted) and one CATEGORY (N:1 with ON DELETE RESTRICT to preserve category structure). The \textbf{rating} is auto-calculated from customer reviews via trigger. \textbf{status} tracks inventory availability and is auto-updated by triggers when stock reaches zero. The updated\_at timestamp enables tracking product modification history.
+
+\subsubsection{PRODUCTITEM Table}
+
+\begin{lstlisting}[language=SQL, caption=PRODUCTITEM Table Creation, label=lst:productitem]
+CREATE TABLE ProductItem (
+    item_id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    shop_id INT NOT NULL,
+    color VARCHAR(50) NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    price DECIMAL(15,2) NOT NULL CHECK(price >= 0),
+    stock INT NOT NULL CHECK(stock >= 0),
+    image_url VARCHAR(255),
+    FOREIGN KEY (product_id) REFERENCES Product(product_id) ON DELETE CASCADE,
+    FOREIGN KEY (shop_id) REFERENCES Shop(shop_id) ON DELETE CASCADE
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The PRODUCTITEM (Variant) table represents purchasable variations of products. The UNIQUE constraint on (product\_id, color, type) prevents duplicate variants of the same product. The \textbf{stock} field tracks inventory levels and is decremented by triggers on order placement, incremented on order cancellation. The \textbf{price} field is stored for each variant, enabling different pricing for sizes/colors.
+
+\subsection{Shopping Cart}
+
+\subsubsection{CART Table}
+\begin{lstlisting}[language=SQL, caption=CART Table Creation, label=lst:cart]
+CREATE TABLE Cart (
+    cart_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customer(customer_id) ON DELETE CASCADE
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The CART table implements a 1:1 relationship with CUSTOMER, ensuring each customer has exactly one shopping cart. The UNIQUE constraint on customer\_id enforces this one-to-one relationship. The updated\_at timestamp tracks cart modification time, useful for session management. ON DELETE CASCADE ensures cart deletion when customer account is removed.
+
+\subsubsection{CARTITEM Table}
+
+\begin{lstlisting}[language=SQL, caption=CARTITEM Table Creation, label=lst:cartitem]
+CREATE TABLE CartItem (
+    cart_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    cart_id INT NOT NULL,
+    item_id INT NOT NULL,
+    quantity INT DEFAULT 1 CHECK(quantity >= 1),
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (cart_id) REFERENCES Cart(cart_id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES ProductItem(item_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_cart_item (cart_id, item_id)
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The CARTITEM table implements the N:M relationship between CART and PRODUCTITEM. The UNIQUE constraint on (cart\_id, item\_id) prevents duplicate items in the same cart. The \textbf{quantity} field tracks the number of units selected, with CHECK constraint ensuring at least 1 unit. ON DELETE CASCADE ensures cart items are removed when either cart or product is deleted.
+
+
+\subsection{Orders and Items}
+
+\subsubsection{ORDER Table}
+
+\begin{lstlisting}[language=SQL, caption=ORDER Table Creation, label=lst:order]
+CREATE TABLE `Order` (
+    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    shipping_id INT NOT NULL,
+    voucher_id INT,
+    status ENUM('Processing','Shipped','Delivered','Cancelled') DEFAULT 'Processing',
+    order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    delivered_date TIMESTAMP NULL,
+    shipping_address VARCHAR(255) NOT NULL,
+    total_amount DECIMAL(15,2) DEFAULT 0,
+    payment_method ENUM('COD','Banking','Momo','ZaloPay') NOT NULL DEFAULT 'COD',
+    note TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customer(customer_id),
+    FOREIGN KEY (shipping_id) REFERENCES Shipping(shipping_id),
+    FOREIGN KEY (voucher_id) REFERENCES Voucher(voucher_id) ON DELETE SET NULL,
+    CONSTRAINT CK_OrderDateRange CHECK (delivered_date IS NULL OR delivered_date >= order_date)
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The ORDER table records all purchase transactions. The \textbf{status} ENUM tracks order lifecycle (Processing → Shipped → Delivered or Cancelled). The \textbf{voucher\_id} is nullable (N:0..1 relationship) since orders may not use vouchers. The CHECK constraint \texttt{delivered\_date >= order\_date} enforces chronological consistency. Indexes on customer\_id, status, and order\_date enable efficient order retrieval and reporting. ON DELETE RESTRICT on shipping\_id prevents accidental deletion of shipping methods in use.
+
+\subsubsection{ORDERITEM Table}
+
+\begin{lstlisting}[language=SQL, caption=ORDERITEM Table Creation, label=lst:orderitem]
+CREATE TABLE OrderItem (
+    order_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    item_id INT NOT NULL,
+    shop_id INT NOT NULL,
+    quantity INT NOT NULL CHECK(quantity >= 1),
+    price_at_purchase DECIMAL(15,2) NOT NULL CHECK(price_at_purchase >= 0),
+    FOREIGN KEY (order_id) REFERENCES `Order`(order_id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES ProductItem(item_id),
+    FOREIGN KEY (shop_id) REFERENCES Shop(shop_id)
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The ORDERITEM table represents individual line items within an order, supporting multi-seller purchases. The \textbf{price\_at\_purchase} field captures the price at transaction time, preserving historical accuracy even if product prices change. The \textbf{shop\_id} field identifies the seller responsible for fulfilling each line item. The UNIQUE constraint on (order\_id, item\_id) prevents duplicate line items. ON DELETE RESTRICT on item\_id and shop\_id ensures order history remains intact.
+
+\subsection{Promotions}
+
+\subsubsection{VOUCHER Table}
+
+\begin{lstlisting}[language=SQL, caption=VOUCHER Table Creation, label=lst:voucher]
+CREATE TABLE Voucher (
+    voucher_id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    discount_type ENUM('Percentage','Amount') NOT NULL,
+    discount_value DECIMAL(10,2) NOT NULL CHECK(discount_value >= 0),
+    min_order_value DECIMAL(15,2) DEFAULT 0 CHECK(min_order_value >= 0),
+    start_date DATE NOT NULL,
+    expired_date DATE NOT NULL,
+    usage_limit INT DEFAULT 1 CHECK(usage_limit >= 1),
+    used_count INT DEFAULT 0,
+    status ENUM('Active','Expired') DEFAULT 'Active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT CK_VoucherDateRange CHECK (expired_date >= start_date)
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The VOUCHER table manages promotional campaigns with flexible discount mechanisms. The \textbf{discount\_type} ENUM supports both percentage (e.g., 10\%) and fixed amount (e.g., 50,000 VND) discounts. The \textbf{min\_order\_value} enforces minimum purchase requirements. The \textbf{usage\_limit} and \textbf{used\_count} fields track voucher usage, preventing over-utilization. The CHECK constraint ensures used\_count never exceeds usage\_limit.
+
+\subsection{Shipping}
+\subsubsection{SHIPPING Table}
+
+\begin{lstlisting}[language=SQL, caption=SHIPPING Table Creation, label=lst:shipping]
+CREATE TABLE Shipping (
+    shipping_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    estimated_days INT NOT NULL CHECK(estimated_days >= 0),
+    fee DECIMAL(10,2) NOT NULL CHECK(fee >= 0),
+    status ENUM('Active','Inactive') DEFAULT 'Active'
+);
+\end{lstlisting}
+
+\paragraph{General Description:}
+The SHIPPING table defines available delivery options for orders. Each record represents a logistics partner or delivery method. The \textbf{estimated\_days} field provides expected delivery timeframes. The \textbf{fee} field enables dynamic shipping cost calculation. The \textbf{status} field controls availability (Active methods appear in checkout, Inactive ones are hidden).
+
+\subsection{Reviews and Feedback}
+\subsubsection{REVIEW Table}
+
+\begin{lstlisting}[language=SQL, caption=REVIEW Table Creation, label=lst:review]
+CREATE TABLE Review (
+    review_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    target_type ENUM('Shop','Product') NOT NULL,
+    target_id INT NOT NULL,
+    rating INT NOT NULL CHECK(rating BETWEEN 1 AND 5),
+    comment TEXT NOT NULL,
+    image_url VARCHAR(255),
+    review_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES Customer(customer_id) ON DELETE CASCADE
+);
+
+\end{lstlisting}
+
+\section{Sample Data Insertion}
+
+This section demonstrates sample data for testing the database schema. Data is organized by entity relationships to maintain referential integrity.
+
+\subsection{Account Data}
+
+\begin{lstlisting}[language=SQL, caption=Sample ACCOUNT Insert, label=lst:insert_account]
+-- Insert 7 accounts: 3 customers, 3 shops, 1 admin
+INSERT INTO Account (email, password, role, full_name, phone, status)
+VALUES
+    ('c1@gmail.com', '1234', 'Customer', 'Nguyen Van A', '0901111111', 'Active'),
+    ('c2@gmail.com', '1234', 'Customer', 'Tran Thi B', '0902222222', 'Active'),
+    ('c3@gmail.com', '1234', 'Customer', 'Le Hoai C', '0903333333', 'Active'),
+    ('s1@gmail.com', '1234', 'Shop', 'Shop ABC', '0904444444', 'Active'),
+    ('s2@gmail.com', '1234', 'Shop', 'Shop XYZ', '0905555555', 'Active'),
+    ('s3@gmail.com', '1234', 'Shop', 'Tech Store', '0906666666', 'Active'),
+    ('admin1@gmail.com', '1234', 'Admin', 'Admin Core', '0907777777', 'Active');
+\end{lstlisting}
+
+\subsection{Customer Data}
+
+\begin{lstlisting}[language=SQL, caption=Sample CUSTOMER Insert, label=lst:insert_customer]
+-- Triggers automatically create CUSTOMER records during INSERT
+-- This example shows updating customer info with addresses
+UPDATE Customer SET 
+    address = '123 Nguyen Hue, District 1, HCMC',
+    add_phone = '0908888888'
+WHERE customer_id = 1;
+
+UPDATE Customer SET 
+    address = '456 Le Loi, District 3, HCMC',
+    add_phone = '0909999999'
+WHERE customer_id = 2;
+
+UPDATE Customer SET 
+    address = '789 Tran Hung Dao, Hoan Kiem, Hanoi',
+    add_phone = '0911111111'
+WHERE customer_id = 3;
+\end{lstlisting}
+
+\subsection{Shop Data}
+
+\begin{lstlisting}[language=SQL, caption=Sample SHOP Insert, label=lst:insert_shop]
+-- Triggers automatically create SHOP records
+-- Update shop information
+UPDATE Shop SET 
+    shop_name = 'Shop ABC - Electronics',
+    shop_phone = '0904444444',
+    address_shop = '12 Vo Van Kiet, District 1',
+    rating = 4.50,
+    shop_status = 'Open'
+WHERE shop_id = 4;
+
+UPDATE Shop SET 
+    shop_name = 'Shop XYZ - Fashion',
+    shop_phone = '0905555555',
+    address_shop = '45 Hai Ba Trung, District 3',
+    rating = 0,
+    shop_status = 'Open'
+WHERE shop_id = 5;
+
+UPDATE Shop SET 
+    shop_name = 'Tech Store - Premium',
+    shop_phone = '0906666666',
+    address_shop = '67 Nguyen Dinh Chieu, District 7',
+    rating = 5.00,
+    shop_status = 'Open'
+WHERE shop_id = 6;
+\end{lstlisting}
+
+\subsection{Category Data}
+
+\begin{lstlisting}[language=SQL, caption=Sample CATEGORY Insert, label=lst:insert_category]
+INSERT INTO Category (category_name, parent_category_id)
+VALUES
+    ('Electronics', NULL),              -- Root: ID 1
+    ('Fashion', NULL),                  -- Root: ID 2
+    ('Phones', 1),                      -- Child of Electronics
+    ('Laptops', 1),                     -- Child of Electronics
+    ('Clothes', 2),                     -- Child of Fashion
+    ('Shoes', 2);                       -- Child of Fashion
+\end{lstlisting}
+
+\subsection{Product and ProductItem Data}
+
+\begin{lstlisting}[language=SQL, caption=Sample PRODUCT Insert, label=lst:insert_product]
+-- Insert products from different shops
+INSERT INTO Product (shop_id, category_id, product_name, 
+                     description, image, status)
+VALUES
+    (4, 3, 'iPhone 15 Pro',
+     'Latest Apple flagship with A17 Pro chip',
+     'iphone15pro.jpg', 'In stock'),
+    
+    (4, 3, 'Samsung Galaxy S24',
+     'Latest Samsung with AI features',
+     'galaxyS24.jpg', 'In stock'),
+    
+    (5, 5, 'Premium Cotton T-Shirt',
+     'High-quality 100% cotton shirt',
+     'tshirt.jpg', 'In stock'),
+    
+    (6, 4, 'MacBook Air M3',
+     'Lightweight laptop for professionals',
+     'macbookm3.jpg', 'In stock'),
+    
+    (6, 3, 'Sony Headset XM5',
+     'Noise-cancelling wireless headphones',
+     'headset.jpg', 'In stock');
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=Sample PRODUCTITEM Insert, label=lst:insert_productitem]
+-- Insert product variants (color, size, capacity)
+INSERT INTO ProductItem (product_id, shop_id, color, type, 
+                        price, stock, image_url)
+VALUES
+    -- iPhone 15 Pro variants (Product 1, Shop 4)
+    (1, 4, 'Space Black', '128GB', 1099000, 50,
+     'iphone15pro-black-128.jpg'),
+    
+    (1, 4, 'Blue Titanium', '256GB', 1199000, 30,
+     'iphone15pro-blue-256.jpg'),
+    
+    -- Samsung Galaxy S24 variants (Product 2, Shop 4)
+    (2, 4, 'Phantom Black', '256GB', 920000, 40,
+     'galaxyS24-black-256.jpg'),
+    
+    (2, 4, 'Amber Gold', '512GB', 1099000, 25,
+     'galaxyS24-gold-512.jpg'),
+    
+    -- T-Shirt variants (Product 3, Shop 5)
+    (3, 5, 'White', 'Size M', 150000, 100,
+     'tshirt-white-m.jpg'),
+    
+    (3, 5, 'Black', 'Size L', 150000, 80,
+     'tshirt-black-l.jpg'),
+    
+    -- MacBook Air M3 variants (Product 4, Shop 6)
+    (4, 6, 'Silver', '16GB RAM', 2299000, 15,
+     'macbookm3-silver-16gb.jpg'),
+    
+    (4, 6, 'Space Gray', '24GB RAM', 2599000, 10,
+     'macbookm3-gray-24gb.jpg'),
+    
+    -- Sony Headset variants (Product 5, Shop 6)
+    (5, 6, 'Black', 'Standard', 4990000, 60,
+     'sonyxm5-black.jpg'),
+    
+    (5, 6, 'Silver', 'Standard', 4990000, 40,
+     'sonyxm5-silver.jpg');
+\end{lstlisting}
+
+\subsection{Shipping and Voucher Data}
+
+\begin{lstlisting}[language=SQL, caption=Sample SHIPPING Insert, label=lst:insert_shipping]
+INSERT INTO Shipping (name, estimated_days, fee, status)
+VALUES
+    ('GHN Express', 2, 15000, 'Active'),
+    ('J&T Standard', 3, 12000, 'Active'),
+    ('Shopee Express', 1, 20000, 'Active'),
+    ('Ninja Van Economy', 4, 9000, 'Active');
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=Sample VOUCHER Insert, label=lst:insert_voucher]
+INSERT INTO Voucher (code, discount_type, discount_value, 
+                     min_order_value, start_date, expired_date, 
+                     usage_limit, status)
+VALUES
+    -- 10% discount, min 500K
+    ('DISCOUNT10', 'Percentage', 10, 500000,
+     '2025-01-01', '2025-12-31', 1000, 'Active'),
+    
+    -- Fixed 100K discount, min 1M
+    ('SAVE100K', 'Amount', 100000, 1000000,
+     '2025-06-01', '2025-12-31', 500, 'Active'),
+    
+    -- New Year promotion: 5% off
+    ('NEWYEAR2025', 'Percentage', 5, 200000,
+     '2025-12-01', '2026-01-31', 2000, 'Active'),
+    
+    -- Expired voucher (for testing)
+    ('OLDCODE', 'Percentage', 15, 300000,
+     '2024-01-01', '2024-12-31', 100, 'Expired');
+\end{lstlisting}
+
+\subsection{Order Transaction Data}
+
+\begin{lstlisting}[language=SQL, caption=Sample ORDER Insert, label=lst:insert_order]
+-- Note: Cart and CartItem are auto-created by triggers
+-- Orders created from shopping carts
+
+-- Order 1: Customer 1, 2 items from Shop 4
+INSERT INTO \`Order\` (customer_id, shipping_id, voucher_id, status,
+                      shipping_address, total_amount, 
+                      payment_method, note)
+VALUES
+    (1, 1, 1, 'Delivered',
+     '123 Nguyen Hue, District 1, HCMC', 2098000,
+     'Banking', 'Received in good condition');
+
+-- Insert order items for Order 1
+INSERT INTO OrderItem (order_id, item_id, shop_id, quantity, 
+                       price_at_purchase)
+VALUES
+    (1, 1, 4, 1, 1099000),  -- iPhone 15 Pro Black 128GB
+    (1, 2, 4, 1, 1199000);  -- iPhone 15 Pro Blue 256GB
+
+-- Order 2: Customer 2, cancelled order
+INSERT INTO \`Order\` (customer_id, shipping_id, voucher_id, status,
+                      shipping_address, total_amount, 
+                      payment_method, note)
+VALUES
+    (2, 2, NULL, 'Cancelled',
+     '456 Le Loi, District 3, HCMC', 932000,
+     'COD', 'Cancelled by customer');
+
+INSERT INTO OrderItem (order_id, item_id, shop_id, quantity, 
+                       price_at_purchase)
+VALUES
+    (2, 3, 4, 1, 920000);   -- Galaxy S24 Black 256GB
+
+-- Order 3: Customer 3, delivered
+INSERT INTO \`Order\` (customer_id, shipping_id, voucher_id, status,
+                      shipping_address, total_amount, 
+                      payment_method, note)
+VALUES
+    (3, 3, 2, 'Delivered',
+     '789 Tran Hung Dao, Hanoi', 170000,
+     'Momo', 'Please leave at reception');
+
+INSERT INTO OrderItem (order_id, item_id, shop_id, quantity, 
+                       price_at_purchase)
+VALUES
+    (3, 5, 5, 1, 150000);   -- T-Shirt White Size M
+
+-- Order 4: Customer 1, shipped
+INSERT INTO \`Order\` (customer_id, shipping_id, voucher_id, status,
+                      shipping_address, total_amount, 
+                      payment_method, note)
+VALUES
+    (1, 4, NULL, 'Shipped',
+     '123 Nguyen Hue, District 1, HCMC', 5009000,
+     'ZaloPay', NULL);
+
+INSERT INTO OrderItem (order_id, item_id, shop_id, quantity, 
+                       price_at_purchase)
+VALUES
+    (4, 9, 6, 1, 4990000);  -- Sony Headset Black
+\end{lstlisting}
+
+\subsection{Review Data}
+
+\begin{lstlisting}[language=SQL, caption=Sample REVIEW Insert, label=lst:insert_review]
+-- Reviews only from verified purchases (Delivered orders)
+
+-- Review 1: Customer 1 reviewed Product 1 (iPhone 15)
+INSERT INTO Review (customer_id, target_type, target_id, 
+                    rating, comment, image_url)
+VALUES
+    (1, 'Product', 1, 5,
+     'Excellent phone! Fast performance and great camera',
+     'review_iphone.jpg'),
+    
+    -- Review 2: Customer 1 reviewed Shop 4
+    (1, 'Shop', 4, 5,
+     'Very reliable seller, fast shipping',
+     NULL),
+    
+    -- Review 3: Customer 3 reviewed Product 3 (T-Shirt)
+    (3, 'Product', 3, 4,
+     'Good quality cotton, true to size',
+     'review_tshirt.jpg'),
+    
+    -- Review 4: Customer 3 reviewed Shop 5
+    (3, 'Shop', 5, 4,
+     'Decent shop, packaging could be better',
+     NULL),
+    
+    -- Review 5: Customer 1 reviewed Product 5 (Headset)
+    (1, 'Product', 5, 5,
+     'Amazing sound quality, very comfortable',
+     'review_headset.jpg'),
+    
+    -- Review 6: Customer 1 reviewed Shop 6
+    (1, 'Shop', 6, 5,
+     'Premium products, excellent customer service',
+     NULL);
+\end{lstlisting}
