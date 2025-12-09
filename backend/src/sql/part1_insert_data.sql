@@ -184,6 +184,7 @@ VALUES
 INSERT INTO Review (customer_id, target_type, target_id, rating, comment, image_url)
 VALUES
  (1,'Product',1,5,'Excellent product',NULL),         -- Customer 1 bought Product 1 (Order 1)
+ (1,'Product',1,3,'Normal',NULL),                    -- Customer 1 bought Product 1 (Order 1)
  (3,'Product',3,4,'Good quality',NULL),              -- Customer 3 bought Product 3 (Order 3)
  (1,'Shop',4,5,'Very professional',NULL),            -- Customer 1 bought from Shop 4 (Order 1)
  (3,'Shop',5,5,'Fast delivery',NULL),                -- Customer 3 bought from Shop 5 (Order 3)

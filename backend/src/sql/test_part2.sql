@@ -111,12 +111,12 @@ SELECT fn_calculate_product_rating(3) AS result;
 -- Review 2 for Product 3: 4 stars
 
 SELECT fn_calculate_product_rating(4) AS result;
--- Expected: 5.00
--- Review 5 for Product 4: 5 stars
+-- Expected: 0.00
+-- No reviews for Product 4
 
 SELECT fn_calculate_product_rating(5) AS result;
--- Expected: 0.00
--- No reviews for Product 5
+-- Expected: 5.00
+--  Review 5 for Product 5: 5 stars
 
 -- ==========================
 -- TEST 5.1: FUNCTION fn_get_order_total_items_with_cursor
